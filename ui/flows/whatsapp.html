@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>WhatsApp</h1>
+  <p class="lead">WhatsApp channel: parents text the school number; the same orchestrator replies.</p>
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="phone-header">School Parent AI</div>
+      <div class="phone-messages" id="waMessages">
+        <div class="bubble bot">Send a WhatsApp-style message about your child.</div>
+      </div>
+      <div class="phone-compose">
+        <input id="waInput" value="Was Ananya present today?" />
+        <button type="button" id="waSend">Send</button>
+      </div>
+    </div>
+  </div>
+  <p class="meta" style="text-align:center;margin-top:14px">Uses the chat API with your phone as guardian thread. Outbound WhatsApp stays stubbed until credentials are set.</p>
+  <div id="waError" class="error" hidden style="text-align:center"></div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+(() => {
+  const thread = document.getElementById('waMessages');
+  const err = document.getElementById('waError');
+  function bubble(text, who, agent) {
+    const el = document.createElement('div');
+    el.className = 'bubble ' + who;
+    el.textContent = text;
+    if (agent) {
+      const tag = document.createElement('span');
+      tag.className = 'agent-tag';
+      tag.textContent = agent;
+      el.appendChild(tag);
+    }
+    thread.appendChild(el);
+    thread.scrollTop = thread.scrollHeight;
+  }
+  document.getElementById('waSend').addEventListener('click', async () => {
+    err.hidden = true;
+    const text = document.getElementById('waInput').value.trim();
+    if (!text) return;
+    bubble(text, 'user');
+    try {
+      const data = await SchoolAPI.chat({
+        guardian_id: '919999999999',
+        student_id: 's1',
+        message: text,
+        language: 'en',
+      });
+      bubble(data.reply || '(no reply)', 'bot', data.agent_used);
+    } catch (e) {
+      err.hidden = false; err.textContent = e.message;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

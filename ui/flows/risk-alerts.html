@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Risk alerts — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>Risk alerts</h1>
+  <p class="lead">Admin management view: nightly insight scan for attendance and assessment risk patterns.</p>
+  <div class="panel">
+    <p>Flags clear patterns only (for example several absences in two weeks, or a sharp mark drop between terms).</p>
+    <div class="actions">
+      <button type="button" id="runScan">Run insight scan</button>
+    </div>
+    <div id="scanError" class="error" hidden></div>
+  </div>
+  <div class="alert-list" id="alertList">
+    <div class="empty-state">No scan yet — run the insight scan to populate alerts.</div>
+  </div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+document.getElementById('runScan').addEventListener('click', async () => {
+  const err = document.getElementById('scanError');
+  const list = document.getElementById('alertList');
+  err.hidden = true;
+  document.getElementById('runScan').disabled = true;
+  try {
+    const data = await SchoolAPI.runInsightScan();
+    const alerts = data.alerts || [];
+    if (!alerts.length) {
+      list.innerHTML = '<div class="empty-state">No risk alerts for this school right now.</div>';
+    } else {
+      list.innerHTML = alerts.map((a) => `
+        <div class="alert-item">
+          <strong>Student ${a.student_id}</strong>
+          <span>${a.detail || ''}</span>
+        </div>
+      `).join('');
+    }
+  } catch (e) {
+    err.hidden = false; err.textContent = e.message;
+  } finally {
+    document.getElementById('runScan').disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>
