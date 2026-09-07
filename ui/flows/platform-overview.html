@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platform overview — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>Platform overview</h1>
+  <p class="lead">The client layer from the architecture — four ways people use School Parent AI.</p>
+  <div class="hub-grid">
+    <a class="hub-card" href="/flows/parent-chat">
+      <div class="eyebrow">Parent app</div>
+      <h3>Parent chat</h3>
+      <p>Ask about attendance, homework, marks, or school questions and get a routed reply.</p>
+    </a>
+    <a class="hub-card" href="/flows/whatsapp">
+      <div class="eyebrow">WhatsApp / voice</div>
+      <h3>WhatsApp</h3>
+      <p>Same helpers on WhatsApp — parents message the school number and get answers back.</p>
+    </a>
+    <a class="hub-card" href="/flows/school-records">
+      <div class="eyebrow">Teacher web</div>
+      <h3>School records</h3>
+      <p>Manage the student roster that tools and daily updates read from.</p>
+    </a>
+    <a class="hub-card" href="/flows/risk-alerts">
+      <div class="eyebrow">Admin web</div>
+      <h3>Risk alerts</h3>
+      <p>Nightly insight scan surfaced for school management.</p>
+    </a>
+  </div>
+  <div class="who">
+    <div class="who-card"><strong>API gateway</strong><span>Auth, tenant routing, and rate limits sit in front of every request.</span></div>
+    <div class="who-card"><strong>Agent services</strong><span>Orchestrator routes to daily update, academic, communication, or insight.</span></div>
+  </div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+</body>
+</html>

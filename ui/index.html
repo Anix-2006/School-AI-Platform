@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+  <div class="topbar-spacer"></div>
+  <span class="docs-link"><a href="/docs" target="_blank" rel="noreferrer">OpenAPI docs</a></span>
+</header>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+
+<main class="page">
+  <h1>School Parent AI</h1>
+  <div class="subtitle">Try students and chat here, or open the sidebar for Parent chat, WhatsApp, records, and admin screens.</div>
+
+  <div class="status-row">
+    <span id="healthPill" class="pill">Checking API…</span>
+    <span id="authPill" class="pill">Auth…</span>
+  </div>
+
+  <section class="workspace" aria-label="Interactive workspace">
+    <div class="panel">
+      <h3>Students</h3>
+      <div class="row">
+        <div>
+          <label for="studentId">Student ID</label>
+          <input id="studentId" value="s1" autocomplete="off">
+        </div>
+        <div>
+          <label for="studentName">Name</label>
+          <input id="studentName" value="Ananya" autocomplete="off">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="studentGrade">Grade</label>
+          <input id="studentGrade" value="3" autocomplete="off">
+        </div>
+        <div>
+          <label for="studentSection">Section</label>
+          <input id="studentSection" value="A" autocomplete="off">
+        </div>
+      </div>
+      <label for="ageTier">Age tier</label>
+      <select id="ageTier">
+        <option value="primary" selected>primary (3–7)</option>
+        <option value="primary_lower">primary_lower (1–2)</option>
+        <option value="pre_primary">pre_primary</option>
+      </select>
+      <div class="actions">
+        <button type="button" id="createStudentBtn">Create student</button>
+        <button type="button" class="secondary" id="refreshStudentsBtn">Refresh list</button>
+      </div>
+      <div id="studentsError" class="error" hidden></div>
+      <div id="studentsList" class="list"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Parent chat</h3>
+      <div class="row">
+        <div>
+          <label for="guardianId">Guardian ID</label>
+          <input id="guardianId" value="g1" autocomplete="off">
+        </div>
+        <div>
+          <label for="chatStudentId">Student ID</label>
+          <input id="chatStudentId" value="s1" autocomplete="off">
+        </div>
+      </div>
+      <label for="chatMessage">Message</label>
+      <textarea id="chatMessage">Was Ananya present today?</textarea>
+      <div class="actions">
+        <button type="button" id="sendChatBtn">Send message</button>
+      </div>
+      <div id="chatError" class="error" hidden></div>
+      <div id="chatReply" class="reply" hidden></div>
+    </div>
+  </section>
+</main>
+
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script>
+(() => {
+  const state = { token: null, tenantId: null };
+
+  const healthPill = document.getElementById('healthPill');
+  const authPill = document.getElementById('authPill');
+  const studentsList = document.getElementById('studentsList');
+  const studentsError = document.getElementById('studentsError');
+  const chatError = document.getElementById('chatError');
+  const chatReply = document.getElementById('chatReply');
+
+  function setError(el, message) {
+    if (!message) {
+      el.hidden = true;
+      el.textContent = '';
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
+  async function api(path, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    if (options.body && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (options.auth) {
+      if (!state.token) throw new Error('Not authenticated yet');
+      headers.Authorization = `Bearer ${state.token}`;
+    }
+    const res = await fetch(path, { ...options, headers });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (!res.ok) {
+      let detail = text.slice(0, 240);
+      if (data && data.detail != null) {
+        detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+      }
+      throw new Error(detail || `${res.status} ${res.statusText}`);
+    }
+    return data;
+  }
+
+  async function boot() {
+    try {
+      const health = await api('/health');
+      healthPill.textContent = `API ${health.status}`;
+      healthPill.classList.remove('bad');
+    } catch (err) {
+      healthPill.textContent = 'API down';
+      healthPill.classList.add('bad');
+      authPill.textContent = 'Auth unavailable';
+      authPill.classList.add('bad');
+      return;
+    }
+
+    try {
+      const auth = await api('/auth/demo-token');
+      state.token = auth.access_token;
+      state.tenantId = auth.tenant_id;
+      authPill.textContent = `Tenant ${auth.tenant_id}`;
+      authPill.classList.remove('bad');
+      await refreshStudents();
+    } catch (err) {
+      authPill.textContent = 'Auth failed';
+      authPill.classList.add('bad');
+      setError(studentsError, err.message);
+    }
+  }
+
+  async function refreshStudents() {
+    setError(studentsError, '');
+    const students = await api('/students', { auth: true });
+    if (!students.length) {
+      studentsList.innerHTML = '<div class="meta">No students yet.</div>';
+      return;
+    }
+    studentsList.innerHTML = students.map((s) => `
+      <div class="list-item">
+        <strong>${s.name}</strong>
+        <div class="meta">${s.id} · grade ${s.grade}${s.section ? s.section : ''} · ${s.age_tier}</div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('refreshStudentsBtn').addEventListener('click', async () => {
+    try {
+      await refreshStudents();
+    } catch (err) {
+      setError(studentsError, err.message);
+    }
+  });
+
+  document.getElementById('createStudentBtn').addEventListener('click', async () => {
+    setError(studentsError, '');
+    const btn = document.getElementById('createStudentBtn');
+    btn.disabled = true;
+    try {
+      const payload = {
+        id: document.getElementById('studentId').value.trim(),
+        name: document.getElementById('studentName').value.trim(),
+        grade: document.getElementById('studentGrade').value.trim(),
+        section: document.getElementById('studentSection').value.trim() || null,
+        age_tier: document.getElementById('ageTier').value,
+      };
+      await api('/students', { method: 'POST', body: JSON.stringify(payload), auth: true });
+      document.getElementById('chatStudentId').value = payload.id;
+      await refreshStudents();
+    } catch (err) {
+      setError(studentsError, err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('sendChatBtn').addEventListener('click', async () => {
+    setError(chatError, '');
+    chatReply.hidden = true;
+    const btn = document.getElementById('sendChatBtn');
+    btn.disabled = true;
+    try {
+      const payload = {
+        guardian_id: document.getElementById('guardianId').value.trim(),
+        student_id: document.getElementById('chatStudentId').value.trim() || null,
+        message: document.getElementById('chatMessage').value.trim(),
+        language: 'en',
+      };
+      const data = await api('/chat', { method: 'POST', body: JSON.stringify(payload), auth: true });
+      chatReply.hidden = false;
+      chatReply.textContent = `${data.reply || ''}\n\n— agent: ${data.agent_used || 'unknown'}`;
+    } catch (err) {
+      setError(chatError, err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>
