@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     env: str = "development"
     default_tenant_id: str = "demo-school"
+    default_teacher_id: str = "t1"
+    teacher_excel_path: str = "data/teacher_workspace.xlsx"
 
     class Config:
         env_file = ".env"

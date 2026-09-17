@@ -7,6 +7,7 @@
     { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp" },
     { href: "/flows/daily-updates", path: "/flows/daily-updates", label: "Daily updates" },
     { href: "/flows/risk-alerts", path: "/flows/risk-alerts", label: "Risk alerts" },
+    { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace" },
     { href: "/flows/school-records", path: "/flows/school-records", label: "School records" },
     { href: "/flows/school-account", path: "/flows/school-account", label: "School account" },
   ];

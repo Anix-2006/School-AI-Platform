@@ -71,5 +71,33 @@
       await ensureAuth();
       return request("/ops/insight-scan", { method: "POST", auth: true });
     },
+    async teacherMe() {
+      await ensureAuth();
+      return request("/teachers/me", { auth: true });
+    },
+    async teacherTimetable() {
+      await ensureAuth();
+      return request("/teachers/me/timetable", { auth: true });
+    },
+    async teacherTasks() {
+      await ensureAuth();
+      return request("/teachers/me/tasks", { auth: true });
+    },
+    async completeTeacherTask(taskId) {
+      await ensureAuth();
+      return request(`/teachers/me/tasks/${encodeURIComponent(taskId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "done" }),
+        auth: true,
+      });
+    },
+    async teacherSyllabus() {
+      await ensureAuth();
+      return request("/teachers/me/syllabus", { auth: true });
+    },
+    async teacherStudents() {
+      await ensureAuth();
+      return request("/teachers/me/students", { auth: true });
+    },
   };
 })();

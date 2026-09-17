@@ -703,3 +703,85 @@ code {
   white-space: pre-wrap;
 }
 
+.stack {
+  display: grid;
+  gap: 32px;
+}
+
+.section-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.section-bar h2 {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.list-tall { max-height: none; }
+
+.timetable-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 8px 0 0;
+}
+
+.timetable {
+  min-width: 640px;
+  margin: 0;
+}
+
+.timetable th {
+  background: #f0f6f4;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.timetable td { vertical-align: top; min-width: 110px; }
+
+.slot strong { display: block; font-size: 13.5px; }
+
+.task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.task-actions button { padding: 6px 10px; font-size: 13px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-transform: capitalize;
+  margin-left: 6px;
+}
+
+.chip.todo, .chip.not_started { background: #f3f1eb; color: var(--muted); }
+.chip.in_progress { background: var(--warn-bg); color: var(--warn-ink); }
+.chip.done, .chip.completed { background: var(--accent-soft); color: var(--accent); }
+
+@media (max-width: 640px) {
+  .task-item { flex-direction: column; }
+}
+
+

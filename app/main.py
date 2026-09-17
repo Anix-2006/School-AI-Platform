@@ -4,13 +4,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 from app.database import Base, SessionLocal, engine
-from app.api import routes_chat, routes_students, routes_webhooks, routes_ops
+from app.api import routes_chat, routes_students, routes_webhooks, routes_ops, routes_teachers
 from app.core.security import create_access_token
 from app.config import settings
 
 # Import models so metadata is fully registered before create_all.
-from app.models import tenant, student, academic, conversation  # noqa: F401
+from app.models import tenant, student, academic, conversation, teacher  # noqa: F401
 from app.models.tenant import Tenant
+from app.services.excel_teacher_store import ensure_workbook
 
 # Dev convenience only - use Alembic migrations in production instead of
 # create_all so schema changes are tracked and reversible.
@@ -26,6 +27,7 @@ FLOW_PAGES = {
     "risk-alerts",
     "school-records",
     "school-account",
+    "teacher-workspace",
 }
 
 app = FastAPI(title="School Parent AI Platform")
@@ -34,6 +36,7 @@ app.include_router(routes_chat.router)
 app.include_router(routes_students.router)
 app.include_router(routes_webhooks.router)
 app.include_router(routes_ops.router)
+app.include_router(routes_teachers.router)
 
 
 @app.on_event("startup")
@@ -43,6 +46,7 @@ def seed_demo_tenant():
         if not db.get(Tenant, settings.default_tenant_id):
             db.add(Tenant(id=settings.default_tenant_id, name="Demo School"))
             db.commit()
+        ensure_workbook()
     finally:
         db.close()
 
