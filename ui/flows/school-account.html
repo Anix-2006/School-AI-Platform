@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School account — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>School account</h1>
+  <p class="lead">Multi-tenant isolation: this session belongs to one school only.</p>
+  <div class="panel">
+    <h3>Current school</h3>
+    <p id="tenantLabel" class="lead" style="margin:0">Loading…</p>
+    <p class="meta">Every student list, chat, daily batch, and insight scan is filtered to this tenant_id.</p>
+  </div>
+  <table>
+    <tr><th>Surface</th><th>What stays school-specific</th></tr>
+    <tr><td>Parent chat</td><td>Answers use only this school’s student records</td></tr>
+    <tr><td>WhatsApp</td><td>Inbound messages handled in this school’s context</td></tr>
+    <tr><td>Daily updates</td><td>Only this school’s consented guardians</td></tr>
+    <tr><td>Risk alerts</td><td>Alerts for this school’s management</td></tr>
+  </table>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+SchoolAPI.ensureAuth().then((s) => {
+  document.getElementById('tenantLabel').textContent = s.tenantId;
+}).catch((e) => {
+  document.getElementById('tenantLabel').textContent = e.message;
+});
+</script>
+
+</body>
+</html>

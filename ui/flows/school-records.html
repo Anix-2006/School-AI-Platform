@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>School records — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>School records</h1>
+  <p class="lead">Teacher web: students the agents and daily jobs read from (tenant, grade, age tier).</p>
+  <div class="workspace">
+    <div class="panel">
+      <h3>Add student</h3>
+      <div class="row">
+        <div><label for="sid">Student ID</label><input id="sid" value="s2"></div>
+        <div><label for="sname">Name</label><input id="sname" value="Rahul"></div>
+      </div>
+      <div class="row">
+        <div><label for="sgrade">Grade</label><input id="sgrade" value="4"></div>
+        <div><label for="ssection">Section</label><input id="ssection" value="B"></div>
+      </div>
+      <label for="stier">Age tier</label>
+      <select id="stier">
+        <option value="primary" selected>primary</option>
+        <option value="primary_lower">primary_lower</option>
+        <option value="pre_primary">pre_primary</option>
+      </select>
+      <div class="actions">
+        <button type="button" id="createBtn">Create student</button>
+        <button type="button" class="secondary" id="refreshBtn">Refresh</button>
+      </div>
+      <div id="recError" class="error" hidden></div>
+    </div>
+    <div class="panel">
+      <h3>Roster</h3>
+      <div id="roster" class="list"><div class="meta">Loading…</div></div>
+    </div>
+  </div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+(() => {
+  const roster = document.getElementById('roster');
+  const err = document.getElementById('recError');
+  async function refresh() {
+    err.hidden = true;
+    const students = await SchoolAPI.listStudents();
+    if (!students.length) {
+      roster.innerHTML = '<div class="meta">No students yet.</div>';
+      return;
+    }
+    roster.innerHTML = students.map((s) => `
+      <div class="list-item">
+        <strong>${s.name}</strong>
+        <div class="meta">${s.id} · grade ${s.grade}${s.section || ''} · ${s.age_tier}</div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('refreshBtn').addEventListener('click', () => refresh().catch((e) => {
+    err.hidden = false; err.textContent = e.message;
+  }));
+  document.getElementById('createBtn').addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await SchoolAPI.createStudent({
+        id: document.getElementById('sid').value.trim(),
+        name: document.getElementById('sname').value.trim(),
+        grade: document.getElementById('sgrade').value.trim(),
+        section: document.getElementById('ssection').value.trim() || null,
+        age_tier: document.getElementById('stier').value,
+      });
+      await refresh();
+    } catch (e) {
+      err.hidden = false; err.textContent = e.message;
+    }
+  });
+  refresh().catch((e) => { roster.innerHTML = '<div class="meta">' + e.message + '</div>'; });
+})();
+</script>
+
+</body>
+</html>

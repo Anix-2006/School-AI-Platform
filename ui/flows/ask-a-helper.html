@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask a helper — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>Ask a helper</h1>
+  <p class="lead">Agent routing: pick the kind of question, send it, and see which specialist answered.</p>
+  <div class="helper-pick">
+    <button type="button" class="helper-card selected" data-q="Was Ananya present today? Any homework?">
+      <h3>Daily update</h3>
+      <p>Attendance, homework, or care log for today.</p>
+    </button>
+    <button type="button" class="helper-card" data-q="How did Ananya do in FA1 Mathematics this term?">
+      <h3>Academic</h3>
+      <p>Marks, rank card, syllabus, or milestones.</p>
+    </button>
+    <button type="button" class="helper-card" data-q="Can I meet the class teacher this week about Ananya?">
+      <h3>Communication</h3>
+      <p>General concerns and teacher requests.</p>
+    </button>
+  </div>
+  <div class="panel">
+    <label for="routeStudent">Student ID</label>
+    <input id="routeStudent" value="s1">
+    <label for="routeMessage">Message</label>
+    <textarea id="routeMessage">Was Ananya present today? Any homework?</textarea>
+    <div class="actions">
+      <button type="button" id="routeSend">Send to orchestrator</button>
+    </div>
+    <div id="routeError" class="error" hidden></div>
+    <div id="routeResult" class="result-box" hidden></div>
+  </div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+(() => {
+  const msg = document.getElementById('routeMessage');
+  document.querySelectorAll('.helper-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.helper-card').forEach((c) => c.classList.remove('selected'));
+      card.classList.add('selected');
+      msg.value = card.getAttribute('data-q');
+    });
+  });
+  document.getElementById('routeSend').addEventListener('click', async () => {
+    const err = document.getElementById('routeError');
+    const box = document.getElementById('routeResult');
+    err.hidden = true; box.hidden = true;
+    try {
+      const data = await SchoolAPI.chat({
+        guardian_id: 'g-route',
+        student_id: document.getElementById('routeStudent').value.trim() || null,
+        message: msg.value.trim(),
+        language: 'en',
+      });
+      box.hidden = false;
+      box.textContent = 'Routed to: ' + (data.agent_used || 'unknown') + '\n\n' + (data.reply || '');
+    } catch (e) {
+      err.hidden = false; err.textContent = e.message;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

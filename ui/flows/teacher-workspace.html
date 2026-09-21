@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher workspace — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>Teacher workspace</h1>
+  <p class="lead" id="teacherLead">What to teach today, and who you teach.</p>
+  <p class="note">Roster, timetable, tasks, and syllabus are read from <code>data/teacher_workspace.xlsx</code>. Edit that workbook and refresh this page. Marking a task done writes back to the Tasks sheet.</p>
+  <div id="pageError" class="error" hidden></div>
+
+  <div class="stack">
+    <section>
+      <div class="section-bar">
+        <h2>Timetable</h2>
+        <div class="actions" style="margin-top:0">
+          <button type="button" class="secondary" id="viewToday">Today</button>
+          <button type="button" id="viewWeek">Week</button>
+        </div>
+      </div>
+      <div class="timetable-scroll">
+        <div id="timetable" class="empty-state">Loading timetable…</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tasks</h2>
+      <div id="tasks" class="list list-tall"><div class="meta">Loading…</div></div>
+    </section>
+
+    <section>
+      <h2>Syllabus this term</h2>
+      <div id="syllabus" class="list list-tall"><div class="meta">Loading…</div></div>
+    </section>
+
+    <section>
+      <h2>My students</h2>
+      <div id="students" class="list list-tall"><div class="meta">Loading…</div></div>
+    </section>
+  </div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+<script>
+(() => {
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const err = document.getElementById("pageError");
+  let slots = [];
+  let weekView = true;
+
+  function esc(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function chip(status) {
+    const label = (status || "").replace(/_/g, " ");
+    return `<span class="chip ${esc(status)}">${esc(label)}</span>`;
+  }
+
+  function showError(message) {
+    err.hidden = false;
+    err.textContent = message;
+  }
+
+  function renderTimetable() {
+    const mount = document.getElementById("timetable");
+    const jsDay = new Date().getDay();
+    const todayName = jsDay >= 1 && jsDay <= 5 ? DAYS[jsDay - 1] : null;
+    const visibleDays = weekView ? DAYS : (todayName ? [todayName] : DAYS);
+
+    const filtered = slots.filter((s) => visibleDays.includes(s.day_name));
+    if (!filtered.length) {
+      mount.innerHTML = weekView
+        ? '<p class="empty-state">No periods on the timetable yet.</p>'
+        : '<p class="empty-state">No periods today.</p>';
+      return;
+    }
+
+    const periods = [...new Set(filtered.map((s) => s.period))].sort((a, b) => a - b);
+    const byKey = {};
+    filtered.forEach((s) => {
+      byKey[`${s.day_name}-${s.period}`] = s;
+    });
+
+    const head = `<tr><th>Period</th>${visibleDays.map((d) => `<th>${esc(d)}</th>`).join("")}</tr>`;
+    const body = periods.map((period) => {
+      const cells = visibleDays.map((day) => {
+        const slot = byKey[`${day}-${period}`];
+        if (!slot) return "<td></td>";
+        const when = slot.start_time ? String(slot.start_time).slice(0, 5) : "";
+        return `<td><div class="slot"><strong>${esc(slot.subject)}</strong><span class="meta">Grade ${esc(slot.grade)}${slot.section ? esc(slot.section) : ""}${slot.room ? " · " + esc(slot.room) : ""}${when ? " · " + esc(when) : ""}</span></div></td>`;
+      }).join("");
+      return `<tr><th>${esc(period)}</th>${cells}</tr>`;
+    }).join("");
+
+    mount.innerHTML = `<table class="timetable">${head}${body}</table>`;
+  }
+
+  function renderTasks(tasks) {
+    const mount = document.getElementById("tasks");
+    if (!tasks.length) {
+      mount.innerHTML = '<div class="empty-state">No tasks.</div>';
+      return;
+    }
+    mount.innerHTML = tasks.map((t) => {
+      const due = t.due_date ? `Due ${esc(t.due_date)}` : "No due date";
+      const subj = t.related_subject ? ` · ${esc(t.related_subject)}` : "";
+      const action = t.status !== "done"
+        ? `<button type="button" class="secondary" data-complete="${esc(t.id)}">Mark done</button>`
+        : "";
+      return `<div class="list-item task-item">
+        <div>
+          <strong>${esc(t.title)}</strong>
+          <div class="meta">${due}${subj}</div>
+        </div>
+        <div class="task-actions">${chip(t.status)}${action}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderSyllabus(rows) {
+    const mount = document.getElementById("syllabus");
+    if (!rows.length) {
+      mount.innerHTML = '<div class="empty-state">No syllabus rows for your subjects.</div>';
+      return;
+    }
+    mount.innerHTML = rows.map((r) => `
+      <div class="list-item">
+        <strong>${esc(r.chapter)}</strong>
+        ${chip(r.status)}
+        <div class="meta">${esc(r.subject)} · grade ${esc(r.grade)}</div>
+      </div>
+    `).join("");
+  }
+
+  function renderStudents(students) {
+    const mount = document.getElementById("students");
+    if (!students.length) {
+      mount.innerHTML = '<div class="empty-state">No students assigned yet.</div>';
+      return;
+    }
+    mount.innerHTML = students.map((s) => {
+      const attend = s.present_today === true ? "present today" : s.present_today === false ? "absent today" : "";
+      return `<div class="list-item">
+        <strong>${esc(s.name)}</strong>
+        <div class="meta">${esc(s.id)} · grade ${esc(s.grade)}${s.section ? esc(s.section) : ""} · ${esc(s.age_tier)}${attend ? " · " + attend : ""}</div>
+      </div>`;
+    }).join("");
+  }
+
+  async function loadTasks() {
+    const tasks = await SchoolAPI.teacherTasks();
+    renderTasks(tasks);
+  }
+
+  async function loadAll() {
+    err.hidden = true;
+    const [me, timetable, tasks, syllabus, students] = await Promise.all([
+      SchoolAPI.teacherMe(),
+      SchoolAPI.teacherTimetable(),
+      SchoolAPI.teacherTasks(),
+      SchoolAPI.teacherSyllabus(),
+      SchoolAPI.teacherStudents(),
+    ]);
+    document.getElementById("teacherLead").textContent =
+      `${me.name} · ${me.role.replace("_", " ")} · ${(me.subjects || []).map((s) => s.subject).join(", ") || "no subjects"}`;
+    slots = timetable;
+    renderTimetable();
+    renderTasks(tasks);
+    renderSyllabus(syllabus);
+    renderStudents(students);
+  }
+
+  document.getElementById("viewToday").addEventListener("click", () => {
+    weekView = false;
+    document.getElementById("viewToday").classList.remove("secondary");
+    document.getElementById("viewWeek").classList.add("secondary");
+    renderTimetable();
+  });
+  document.getElementById("viewWeek").addEventListener("click", () => {
+    weekView = true;
+    document.getElementById("viewWeek").classList.remove("secondary");
+    document.getElementById("viewToday").classList.add("secondary");
+    renderTimetable();
+  });
+
+  document.getElementById("tasks").addEventListener("click", async (event) => {
+    const btn = event.target.closest("[data-complete]");
+    if (!btn) return;
+    btn.disabled = true;
+    try {
+      await SchoolAPI.completeTeacherTask(btn.getAttribute("data-complete"));
+      await loadTasks();
+    } catch (e) {
+      showError(e.message);
+    }
+  });
+
+  loadAll().catch((e) => showError(e.message));
+})();
+</script>
+</body>
+</html>

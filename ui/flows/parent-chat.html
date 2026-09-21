@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parent chat — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>Parent chat</h1>
+  <p class="lead">Parent app: send a message about your child and get a tool-grounded reply.</p>
+  <div class="chat-shell">
+    <div class="panel">
+      <h3>Context</h3>
+      <label for="guardianId">Guardian ID</label>
+      <input id="guardianId" value="g1">
+      <label for="studentId">Student ID</label>
+      <input id="studentId" value="s1">
+      <label for="language">Language</label>
+      <select id="language">
+        <option value="en" selected>English</option>
+        <option value="hi">Hindi</option>
+        <option value="te">Telugu</option>
+      </select>
+      <p class="meta" id="authMeta" style="margin-top:12px">Connecting…</p>
+    </div>
+    <div class="chat-thread">
+      <div class="chat-messages" id="messages">
+        <div class="bubble bot">Hi — ask about attendance, homework, marks, or anything school-related.</div>
+      </div>
+      <div class="chat-compose">
+        <textarea id="message" placeholder="Was Ananya present today?">Was Ananya present today?</textarea>
+        <div class="actions">
+          <button type="button" id="sendBtn">Send message</button>
+        </div>
+        <div id="chatError" class="error" hidden></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+(() => {
+  const messages = document.getElementById('messages');
+  const err = document.getElementById('chatError');
+  const authMeta = document.getElementById('authMeta');
+
+  function addBubble(text, who, agent) {
+    const el = document.createElement('div');
+    el.className = 'bubble ' + who;
+    el.textContent = text;
+    if (agent) {
+      const tag = document.createElement('span');
+      tag.className = 'agent-tag';
+      tag.textContent = 'helper: ' + agent;
+      el.appendChild(tag);
+    }
+    messages.appendChild(el);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  SchoolAPI.ensureAuth().then((s) => {
+    authMeta.textContent = 'School: ' + s.tenantId;
+  }).catch((e) => { authMeta.textContent = e.message; });
+
+  document.getElementById('sendBtn').addEventListener('click', async () => {
+    err.hidden = true;
+    const message = document.getElementById('message').value.trim();
+    if (!message) return;
+    addBubble(message, 'user');
+    document.getElementById('sendBtn').disabled = true;
+    try {
+      const data = await SchoolAPI.chat({
+        guardian_id: document.getElementById('guardianId').value.trim(),
+        student_id: document.getElementById('studentId').value.trim() || null,
+        message,
+        language: document.getElementById('language').value,
+      });
+      addBubble(data.reply || '(empty reply)', 'bot', data.agent_used);
+    } catch (e) {
+      err.hidden = false;
+      err.textContent = e.message;
+    } finally {
+      document.getElementById('sendBtn').disabled = false;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

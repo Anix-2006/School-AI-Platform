@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily updates — School Parent AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+<main class="page">
+
+  <h1>Daily updates</h1>
+  <p class="lead">Daily batch job: push today’s summary to every guardian who has given consent.</p>
+  <div class="panel">
+    <p>For each active student, the job finds guardians, skips anyone without <code>consent_given_at</code>, generates a daily update, and sends WhatsApp when a number is on file.</p>
+    <div class="actions">
+      <button type="button" id="runBatch">Run daily batch now</button>
+    </div>
+    <div id="batchError" class="error" hidden></div>
+    <div id="batchResult" class="result-box" hidden></div>
+  </div>
+  <div class="note">Guardians need consent + a WhatsApp number before anything is sent. Without those, you’ll see students processed but messages_sent = 0.</div>
+
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+
+<script>
+document.getElementById('runBatch').addEventListener('click', async () => {
+  const err = document.getElementById('batchError');
+  const box = document.getElementById('batchResult');
+  err.hidden = true; box.hidden = true;
+  document.getElementById('runBatch').disabled = true;
+  try {
+    const data = await SchoolAPI.runDailyBatch();
+    box.hidden = false;
+    box.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    err.hidden = false; err.textContent = e.message;
+  } finally {
+    document.getElementById('runBatch').disabled = false;
+  }
+});
+</script>
+
+</body>
+</html>
