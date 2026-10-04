@@ -9,6 +9,7 @@ from langchain_core.tools import tool
 from app.database import SessionLocal
 from app.models.student import Student, Guardian
 from app.models.academic import Attendance, DailyDiary, AssessmentRecord, MilestoneRecord, SyllabusProgress
+from app.models.teacher import Teacher, TeacherStudentAssignment
 from app.services.rag_service import search_curriculum
 
 
@@ -133,6 +134,45 @@ def get_syllabus_progress(tenant_id: str, grade: str, subject: str) -> list[dict
 
 
 @tool
+def get_teachers_for_student(student_id: str, subject: str = "") -> dict:
+    """List the teachers assigned to a student: whether each is the class
+    teacher, and which subjects they teach this student. Pass subject
+    (e.g. 'Math') to keep only that subject's teacher; the class teacher is
+    always included as the default contact. Returns {"teachers": []} when no
+    teachers are assigned yet."""
+    db = SessionLocal()
+    try:
+        if not db.get(Student, student_id):
+            return {"error": "student not found"}
+        rows = (
+            db.query(TeacherStudentAssignment, Teacher)
+            .join(Teacher, Teacher.id == TeacherStudentAssignment.teacher_id)
+            .filter(
+                TeacherStudentAssignment.student_id == student_id,
+                Teacher.active.isnot(False),
+            )
+            .order_by(Teacher.name, TeacherStudentAssignment.subject)
+            .all()
+        )
+        wanted = subject.strip().lower()
+        teachers: dict[str, dict] = {}
+        for assignment, teacher in rows:
+            is_class_teacher = assignment.relationship == "class_teacher"
+            if not is_class_teacher and wanted and assignment.subject.lower() != wanted:
+                continue
+            entry = teachers.setdefault(
+                teacher.id, {"name": teacher.name, "class_teacher": False, "subjects": []}
+            )
+            if is_class_teacher:
+                entry["class_teacher"] = True
+            elif assignment.subject and assignment.subject not in entry["subjects"]:
+                entry["subjects"].append(assignment.subject)
+        return {"teachers": list(teachers.values())}
+    finally:
+        db.close()
+
+
+@tool
 def search_cbse_curriculum(query: str, grade: str, subject: str) -> str:
     """Search the CBSE/NCERT curriculum RAG index for content relevant to
     a parent's question (e.g. 'what is my child learning in Math this month')."""
@@ -142,5 +182,5 @@ def search_cbse_curriculum(query: str, grade: str, subject: str) -> str:
 DAILY_UPDATE_TOOLS = [get_student_profile, get_attendance, get_daily_diary]
 ACADEMIC_TOOLS = [get_student_profile, get_assessment_records, get_milestone_records, get_syllabus_progress]
 COMMUNICATION_TOOLS = [get_student_profile, get_attendance, get_daily_diary, search_cbse_curriculum]
-PARENT_TEACHER_TOOLS = [get_student_profile]
+PARENT_TEACHER_TOOLS = [get_student_profile, get_teachers_for_student]
 INSIGHT_TOOLS = [get_attendance, get_assessment_records]

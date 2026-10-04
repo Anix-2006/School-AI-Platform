@@ -53,12 +53,17 @@ def test_node_marks_missing_student_as_unknown(monkeypatch):
 
 
 def test_only_light_tools_are_bound():
-    assert [t.name for t in PARENT_TEACHER_TOOLS] == ["get_student_profile"]
+    assert [t.name for t in PARENT_TEACHER_TOOLS] == [
+        "get_student_profile",
+        "get_teachers_for_student",
+    ]
 
 
 def test_prompt_rules():
     prompt = parent_teacher_agent.SYSTEM_PROMPT
     assert "Never invent teacher names" in prompt
+    assert "Only name teachers returned by get_teachers_for_student" in prompt
+    assert "Never share a teacher's phone number or email" in prompt
     assert "escalated to the class teacher" in prompt
     assert "Only discuss the student in context" in prompt
 
