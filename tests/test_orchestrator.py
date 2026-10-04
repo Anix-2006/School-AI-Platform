@@ -25,4 +25,4 @@ def test_router_classifies_daily_update():
         "route_to": None,
     }
     result = orchestrator_graph.invoke(state, config=config)
-    assert result["route_to"] in ("daily_update", "academic", "communication")
+    assert result["route_to"] in ("daily_update", "academic", "parent_teacher", "communication")

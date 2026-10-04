@@ -19,16 +19,31 @@ router_llm = ChatOpenAI(model=settings.openai_model_fast, api_key=settings.opena
 ROUTER_PROMPT = """Classify the parent's message into exactly one route:
 - "daily_update" - asking about today's attendance, homework, or care log
 - "academic" - asking about marks, rank card, syllabus progress, milestones
-- "communication" - anything else (general questions, concerns, teacher requests)
+- "parent_teacher" - wants to reach, message, or find out about a teacher
+  (e.g. "Can you tell the class teacher she'll be late tomorrow?",
+  "Who teaches Math?", "I want to meet the class teacher",
+  "Please pass a message to the English teacher")
+- "communication" - anything else (general questions, concerns)
 
 Reply with only the route name, nothing else."""
+
+# parent_teacher has no dedicated agent yet, so it runs on the communication
+# node while route_to still reports "parent_teacher". Next step: add a
+# parent_teacher agent node with teacher lookup tools and point this route
+# at it.
+ROUTE_TO_NODE = {
+    "daily_update": "daily_update",
+    "academic": "academic",
+    "parent_teacher": "communication",
+    "communication": "communication",
+}
 
 
 def router_node(state: AgentState) -> dict:
     messages = [SystemMessage(content=ROUTER_PROMPT)] + state["messages"]
     response = router_llm.invoke(messages)
-    route = response.content.strip().lower()
-    if route not in ("daily_update", "academic", "communication"):
+    route = response.content.strip().strip("\"'").lower()
+    if route not in ROUTE_TO_NODE:
         route = "communication"  # safe default - most flexible agent
     return {"route_to": route}
 
@@ -46,15 +61,7 @@ def build_graph():
     graph.add_node("communication", communication_node)
 
     graph.set_entry_point("router")
-    graph.add_conditional_edges(
-        "router",
-        route_decision,
-        {
-            "daily_update": "daily_update",
-            "academic": "academic",
-            "communication": "communication",
-        },
-    )
+    graph.add_conditional_edges("router", route_decision, ROUTE_TO_NODE)
     graph.add_edge("daily_update", END)
     graph.add_edge("academic", END)
     graph.add_edge("communication", END)
