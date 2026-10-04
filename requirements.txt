@@ -16,3 +16,4 @@ apscheduler==3.10.4
 alembic==1.13.3
 pgvector==0.3.4
 openpyxl==3.1.5
+numpy==2.4.6

@@ -11,3 +11,5 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     agent_used: str | None = None
+    intent_source: str | None = None
+    intent_confidence: float | None = None

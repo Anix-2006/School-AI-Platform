@@ -36,8 +36,12 @@
       <p>Marks, rank card, syllabus, or milestones.</p>
     </button>
     <button type="button" class="helper-card" data-q="Can I meet the class teacher this week about Ananya?">
+      <h3>Parent–teacher</h3>
+      <p>Messages, meetings, or concerns for a teacher.</p>
+    </button>
+    <button type="button" class="helper-card" data-q="When is the annual day function this year?">
       <h3>Communication</h3>
-      <p>General concerns and teacher requests.</p>
+      <p>School timings, holidays, events, fees, and other questions.</p>
     </button>
   </div>
   <div class="panel">
@@ -79,7 +83,10 @@
         language: 'en',
       });
       box.hidden = false;
-      box.textContent = 'Routed to: ' + (data.agent_used || 'unknown') + '\n\n' + (data.reply || '');
+      const decidedBy = data.intent_source === 'classifier'
+        ? `intent classifier, ${Math.round(data.intent_confidence * 100)}% confident`
+        : 'LLM router';
+      box.textContent = `Routed to: ${data.agent_used || 'unknown'} (${decidedBy})\n\n${data.reply || ''}`;
     } catch (e) {
       err.hidden = false; err.textContent = e.message;
     }

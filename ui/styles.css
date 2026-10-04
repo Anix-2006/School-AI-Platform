@@ -655,7 +655,7 @@ code {
 }
 
 @media (min-width: 800px) {
-  .helper-pick { grid-template-columns: 1fr 1fr 1fr; }
+  .helper-pick { grid-template-columns: 1fr 1fr; }
 }
 
 .helper-card {

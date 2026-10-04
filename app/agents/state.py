@@ -16,3 +16,5 @@ class AgentState(TypedDict):
     age_tier: Optional[str]  # pre_primary / primary_lower / primary
     intent: Optional[str]    # set by orchestrator's router step
     route_to: Optional[str]  # which specialist agent handles this turn
+    intent_source: Optional[str]        # "classifier" or "llm"
+    intent_confidence: Optional[float]  # classifier probability; None for llm
