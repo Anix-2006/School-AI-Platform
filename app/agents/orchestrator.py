@@ -13,6 +13,7 @@ from app.agents.state import AgentState
 from app.agents.daily_update_agent import daily_update_node
 from app.agents.academic_agent import academic_node
 from app.agents.communication_agent import communication_node
+from app.agents.parent_teacher_agent import parent_teacher_node
 
 router_llm = ChatOpenAI(model=settings.openai_model_fast, api_key=settings.openai_api_key)
 
@@ -27,14 +28,10 @@ ROUTER_PROMPT = """Classify the parent's message into exactly one route:
 
 Reply with only the route name, nothing else."""
 
-# parent_teacher has no dedicated agent yet, so it runs on the communication
-# node while route_to still reports "parent_teacher". Next step: add a
-# parent_teacher agent node with teacher lookup tools and point this route
-# at it.
 ROUTE_TO_NODE = {
     "daily_update": "daily_update",
     "academic": "academic",
-    "parent_teacher": "communication",
+    "parent_teacher": "parent_teacher",
     "communication": "communication",
 }
 
@@ -59,12 +56,14 @@ def build_graph():
     graph.add_node("daily_update", daily_update_node)
     graph.add_node("academic", academic_node)
     graph.add_node("communication", communication_node)
+    graph.add_node("parent_teacher", parent_teacher_node)
 
     graph.set_entry_point("router")
     graph.add_conditional_edges("router", route_decision, ROUTE_TO_NODE)
     graph.add_edge("daily_update", END)
     graph.add_edge("academic", END)
     graph.add_edge("communication", END)
+    graph.add_edge("parent_teacher", END)
 
     # MemorySaver for dev - swap for a Postgres checkpointer in production
     # so conversation state survives restarts and scales across replicas.

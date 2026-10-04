@@ -45,5 +45,5 @@ def test_router_prompt_lists_parent_teacher():
     assert '"parent_teacher"' in orchestrator.ROUTER_PROMPT
 
 
-def test_parent_teacher_runs_on_communication_node():
-    assert orchestrator.ROUTE_TO_NODE["parent_teacher"] == "communication"
+def test_parent_teacher_runs_on_its_own_node():
+    assert orchestrator.ROUTE_TO_NODE["parent_teacher"] == "parent_teacher"

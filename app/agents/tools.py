@@ -142,4 +142,5 @@ def search_cbse_curriculum(query: str, grade: str, subject: str) -> str:
 DAILY_UPDATE_TOOLS = [get_student_profile, get_attendance, get_daily_diary]
 ACADEMIC_TOOLS = [get_student_profile, get_assessment_records, get_milestone_records, get_syllabus_progress]
 COMMUNICATION_TOOLS = [get_student_profile, get_attendance, get_daily_diary, search_cbse_curriculum]
+PARENT_TEACHER_TOOLS = [get_student_profile]
 INSIGHT_TOOLS = [get_attendance, get_assessment_records]
