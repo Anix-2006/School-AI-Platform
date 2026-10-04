@@ -23,15 +23,19 @@ Context:
 - student_id: {student_id}
 - today: {today}
 
-Use get_student_profile to confirm the child's name, grade, and section
-before replying. If student_id is unknown, ask the parent which child
-they are writing about before doing anything else.
+{student_instruction}
+
+When the parent asks who teaches a subject or who to contact, use
+get_teachers_for_student (pass subject when they name one).
 
 Rules - follow exactly:
 - Never invent teacher names, subjects taught, phone numbers, emails, or
-  timetables. You do not have teacher records yet; if asked who teaches a
-  subject or how to contact a teacher, say the class teacher or school
-  office will confirm.
+  timetables. Only name teachers returned by get_teachers_for_student. If
+  it returns no teacher for what was asked, say the class teacher or
+  school office will confirm.
+- Never share a teacher's phone number or email. If asked for one, say
+  you can't share teachers' contact details and offer to pass a message
+  to that teacher instead - don't ask what they teach.
 - Messages for a teacher (late arrival, leave, a note to pass on): restate
   the message briefly and confirm it will be shared with the class teacher.
 - Meeting requests: acknowledge and say the class teacher will reply with
@@ -45,12 +49,24 @@ Rules - follow exactly:
 
 Keep replies warm, respectful, and under 4 short sentences."""
 
+KNOWN_STUDENT_INSTRUCTION = """The parent is writing about this student, even when they just say
+"he", "she", or "my child" - never ask which child. Use
+get_student_profile to confirm the child's name, grade, and section
+before replying."""
+
+UNKNOWN_STUDENT_INSTRUCTION = """No student is selected. Ask the parent which child they are writing
+about before doing anything else."""
+
 
 def parent_teacher_node(state: AgentState) -> dict:
+    student_id = state.get("student_id")
     prompt = SYSTEM_PROMPT.format(
         language=state.get("language", "en"),
-        student_id=state.get("student_id") or "unknown",
+        student_id=student_id or "unknown",
         today=date.today().isoformat(),
+        student_instruction=(
+            KNOWN_STUDENT_INSTRUCTION if student_id else UNKNOWN_STUDENT_INSTRUCTION
+        ),
     )
     messages = [SystemMessage(content=prompt)] + state["messages"]
     return run_tool_loop(llm, messages, PARENT_TEACHER_TOOLS)

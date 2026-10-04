@@ -38,6 +38,8 @@ def test_node_builds_prompt_from_state(monkeypatch):
     assert isinstance(system, SystemMessage)
     assert "student_id: s1" in system.content
     assert "writing to a parent in hi" in system.content
+    assert "never ask which child" in system.content
+    assert "No student is selected" not in system.content
     assert result["messages"][-1].content == "I'll share this with the class teacher."
 
 
@@ -49,16 +51,24 @@ def test_node_marks_missing_student_as_unknown(monkeypatch):
         {"messages": [HumanMessage(content="Who teaches Math?")], "student_id": None}
     )
 
-    assert "student_id: unknown" in fake.calls[0][0].content
+    system = fake.calls[0][0].content
+    assert "student_id: unknown" in system
+    assert "Ask the parent which child" in system
+    assert "never ask which child" not in system
 
 
 def test_only_light_tools_are_bound():
-    assert [t.name for t in PARENT_TEACHER_TOOLS] == ["get_student_profile"]
+    assert [t.name for t in PARENT_TEACHER_TOOLS] == [
+        "get_student_profile",
+        "get_teachers_for_student",
+    ]
 
 
 def test_prompt_rules():
     prompt = parent_teacher_agent.SYSTEM_PROMPT
     assert "Never invent teacher names" in prompt
+    assert "Only name teachers returned by get_teachers_for_student" in prompt
+    assert "Never share a teacher's phone number or email" in prompt
     assert "escalated to the class teacher" in prompt
     assert "Only discuss the student in context" in prompt
 

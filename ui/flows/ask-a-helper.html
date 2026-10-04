@@ -77,7 +77,8 @@
     err.hidden = true; box.hidden = true;
     try {
       const data = await SchoolAPI.chat({
-        guardian_id: 'g-route',
+        // Fresh thread per send so earlier questions don't leak into this one.
+        guardian_id: `g-route-${Date.now()}`,
         student_id: document.getElementById('routeStudent').value.trim() || null,
         message: msg.value.trim(),
         language: 'en',
