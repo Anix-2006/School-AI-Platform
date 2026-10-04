@@ -138,7 +138,8 @@ def get_teachers_for_student(student_id: str, subject: str = "") -> dict:
     """List the teachers assigned to a student: whether each is the class
     teacher, and which subjects they teach this student. Pass subject
     (e.g. 'Math') to keep only that subject's teacher; the class teacher is
-    always included as the default contact. Returns {"teachers": []} when no
+    always included as the default contact, and a note is added when no
+    teacher is assigned for that subject. Returns {"teachers": []} when no
     teachers are assigned yet."""
     db = SessionLocal()
     try:
@@ -167,7 +168,13 @@ def get_teachers_for_student(student_id: str, subject: str = "") -> dict:
                 entry["class_teacher"] = True
             elif assignment.subject and assignment.subject not in entry["subjects"]:
                 entry["subjects"].append(assignment.subject)
-        return {"teachers": list(teachers.values())}
+        result = {"teachers": list(teachers.values())}
+        if wanted and not any(entry["subjects"] for entry in result["teachers"]):
+            result["note"] = (
+                f"No {subject.strip()} teacher is assigned to this student. "
+                "The class teacher does not teach this subject."
+            )
+        return result
     finally:
         db.close()
 

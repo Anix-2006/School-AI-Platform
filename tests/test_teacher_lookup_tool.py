@@ -52,9 +52,11 @@ def test_subject_filter_keeps_class_teacher(session_factory):
     }
 
 
-def test_subject_with_no_teacher_returns_only_class_teacher(session_factory):
+def test_subject_with_no_teacher_returns_class_teacher_and_note(session_factory):
     assert lookup(student_id="s1", subject="Hindi") == {
-        "teachers": [{"name": "Priya Sharma", "class_teacher": True, "subjects": []}]
+        "teachers": [{"name": "Priya Sharma", "class_teacher": True, "subjects": []}],
+        "note": "No Hindi teacher is assigned to this student. "
+        "The class teacher does not teach this subject.",
     }
 
 
