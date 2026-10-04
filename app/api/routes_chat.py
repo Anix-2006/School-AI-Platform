@@ -26,4 +26,9 @@ async def chat(req: ChatRequest, tenant_id: str = Depends(get_current_tenant)):
     }
     result = orchestrator_graph.invoke(initial_state, config=config)
     reply = extract_text_reply(result["messages"])
-    return ChatResponse(reply=reply, agent_used=result.get("route_to"))
+    return ChatResponse(
+        reply=reply,
+        agent_used=result.get("route_to"),
+        intent_source=result.get("intent_source"),
+        intent_confidence=result.get("intent_confidence"),
+    )

@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_model_fast: str = "gpt-4o-mini"
     openai_model_strong: str = "gpt-4o"
+    # Below this classifier confidence the orchestrator asks the LLM router.
+    intent_confidence_threshold: float = 0.6
 
     database_url: str = "sqlite:///./dev.db"
 

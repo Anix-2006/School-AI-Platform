@@ -1,0 +1,159 @@
+{"text": "Was my child present today?", "intent": "daily_update", "lang": "en"}
+{"text": "Did Ananya come to school today?", "intent": "daily_update", "lang": "en"}
+{"text": "Is there any homework today?", "intent": "daily_update", "lang": "en"}
+{"text": "What homework was given today?", "intent": "daily_update", "lang": "en"}
+{"text": "What did Rahul have for lunch today?", "intent": "daily_update", "lang": "en"}
+{"text": "Did my daughter sleep during nap time?", "intent": "daily_update", "lang": "en"}
+{"text": "How was her mood at school today?", "intent": "daily_update", "lang": "en"}
+{"text": "Was he marked absent today?", "intent": "daily_update", "lang": "en"}
+{"text": "Why was my son marked absent yesterday?", "intent": "daily_update", "lang": "en"}
+{"text": "Did she reach school on time this morning?", "intent": "daily_update", "lang": "en"}
+{"text": "What is today's diary entry?", "intent": "daily_update", "lang": "en"}
+{"text": "Any homework for tomorrow?", "intent": "daily_update", "lang": "en"}
+{"text": "What activity did they do in class today?", "intent": "daily_update", "lang": "en"}
+{"text": "Did my child eat his snack?", "intent": "daily_update", "lang": "en"}
+{"text": "Was my kid late today?", "intent": "daily_update", "lang": "en"}
+{"text": "Did Ananya attend school on Monday?", "intent": "daily_update", "lang": "en"}
+{"text": "How was my son's day?", "intent": "daily_update", "lang": "en"}
+{"text": "Has the teacher written anything in the diary today?", "intent": "daily_update", "lang": "en"}
+{"text": "What is the activity theme this week?", "intent": "daily_update", "lang": "en"}
+{"text": "Did she leave school early today?", "intent": "daily_update", "lang": "en"}
+{"text": "Can you give me today's update for Ananya?", "intent": "daily_update", "lang": "en"}
+{"text": "Is the homework only for Maths or other subjects too?", "intent": "daily_update", "lang": "en"}
+{"text": "Was there any note from school today?", "intent": "daily_update", "lang": "en"}
+{"text": "Did my child take his medicine at school today?", "intent": "daily_update", "lang": "en"}
+{"text": "How many days was she absent this week?", "intent": "daily_update", "lang": "en"}
+{"text": "What was done in the care log today?", "intent": "daily_update", "lang": "en"}
+{"text": "Aaj Ananya school aayi thi kya?", "intent": "daily_update", "lang": "hinglish"}
+{"text": "Aaj ka homework kya hai?", "intent": "daily_update", "lang": "hinglish"}
+{"text": "Kya mera beta aaj present tha?", "intent": "daily_update", "lang": "hinglish"}
+{"text": "Aaj usne lunch khaya?", "intent": "daily_update", "lang": "hinglish"}
+{"text": "Aaj ki diary mein kya likha hai?", "intent": "daily_update", "lang": "hinglish"}
+{"text": "Kal ka homework bata do", "intent": "daily_update", "lang": "hinglish"}
+{"text": "Beti ka aaj mood kaisa tha?", "intent": "daily_update", "lang": "hinglish"}
+{"text": "क्या आज मेरा बच्चा स्कूल आया था?", "intent": "daily_update", "lang": "hi"}
+{"text": "आज का होमवर्क क्या है?", "intent": "daily_update", "lang": "hi"}
+{"text": "क्या आज उसकी हाज़िरी लगी?", "intent": "daily_update", "lang": "hi"}
+{"text": "आज उसने खाना खाया या नहीं?", "intent": "daily_update", "lang": "hi"}
+{"text": "आज डायरी में क्या लिखा है?", "intent": "daily_update", "lang": "hi"}
+{"text": "ఈరోజు మా అమ్మాయి స్కూల్‌కి వచ్చిందా?", "intent": "daily_update", "lang": "te"}
+{"text": "ఈరోజు హోంవర్క్ ఏమిటి?", "intent": "daily_update", "lang": "te"}
+{"text": "ఈరోజు మా అబ్బాయి భోజనం చేశాడా?", "intent": "daily_update", "lang": "te"}
+{"text": "ఈరోజు వాడు ప్రెజెంట్ ఉన్నాడా?", "intent": "daily_update", "lang": "te"}
+{"text": "How did Ananya do in FA1 Mathematics?", "intent": "academic", "lang": "en"}
+{"text": "What are my son's marks in Science?", "intent": "academic", "lang": "en"}
+{"text": "Can I see the rank card for this term?", "intent": "academic", "lang": "en"}
+{"text": "What was her score in the English test?", "intent": "academic", "lang": "en"}
+{"text": "How many chapters of Maths are completed?", "intent": "academic", "lang": "en"}
+{"text": "Is the syllabus for SA1 finished?", "intent": "academic", "lang": "en"}
+{"text": "How is my child performing overall this term?", "intent": "academic", "lang": "en"}
+{"text": "Did his marks improve compared to last term?", "intent": "academic", "lang": "en"}
+{"text": "What is her rank in class?", "intent": "academic", "lang": "en"}
+{"text": "Which subjects is he weak in?", "intent": "academic", "lang": "en"}
+{"text": "What does the report card say about Rahul?", "intent": "academic", "lang": "en"}
+{"text": "How is my daughter progressing in her milestones?", "intent": "academic", "lang": "en"}
+{"text": "Is my child meeting the developmental milestones for UKG?", "intent": "academic", "lang": "en"}
+{"text": "What remarks did the teacher give in the progress report?", "intent": "academic", "lang": "en"}
+{"text": "How much of the Hindi syllabus has been covered?", "intent": "academic", "lang": "en"}
+{"text": "Show me the FA2 results", "intent": "academic", "lang": "en"}
+{"text": "What grade did she get in EVS?", "intent": "academic", "lang": "en"}
+{"text": "Is he falling behind in Mathematics?", "intent": "academic", "lang": "en"}
+{"text": "Why have her marks dropped this term?", "intent": "academic", "lang": "en"}
+{"text": "Which chapter is the Science class on now?", "intent": "academic", "lang": "en"}
+{"text": "How did my son do in the unit test?", "intent": "academic", "lang": "en"}
+{"text": "What are his total marks in SA1?", "intent": "academic", "lang": "en"}
+{"text": "Can you send me the progress report?", "intent": "academic", "lang": "en"}
+{"text": "Has the teacher started the fractions chapter yet?", "intent": "academic", "lang": "en"}
+{"text": "How is her reading level progressing?", "intent": "academic", "lang": "en"}
+{"text": "FA1 mein Ananya ke kitne marks aaye?", "intent": "academic", "lang": "hinglish"}
+{"text": "Maths ka syllabus kitna complete hua?", "intent": "academic", "lang": "hinglish"}
+{"text": "Mere bete ka rank kya hai?", "intent": "academic", "lang": "hinglish"}
+{"text": "Uski padhai kaisi chal rahi hai?", "intent": "academic", "lang": "hinglish"}
+{"text": "Science mein marks kam kyun aaye?", "intent": "academic", "lang": "hinglish"}
+{"text": "Report card mein kya likha hai?", "intent": "academic", "lang": "hinglish"}
+{"text": "गणित में मेरे बच्चे के कितने अंक आए?", "intent": "academic", "lang": "hi"}
+{"text": "इस टर्म में उसकी रैंक क्या है?", "intent": "academic", "lang": "hi"}
+{"text": "हिंदी का सिलेबस कितना पूरा हुआ?", "intent": "academic", "lang": "hi"}
+{"text": "उसकी पढ़ाई में प्रगति कैसी है?", "intent": "academic", "lang": "hi"}
+{"text": "FA1 లో మా అమ్మాయికి ఎన్ని మార్కులు వచ్చాయి?", "intent": "academic", "lang": "te"}
+{"text": "గణితం సిలబస్ ఎంత పూర్తయింది?", "intent": "academic", "lang": "te"}
+{"text": "మా అబ్బాయి ర్యాంక్ ఎంత?", "intent": "academic", "lang": "te"}
+{"text": "చదువులో వాడి ప్రగతి ఎలా ఉంది?", "intent": "academic", "lang": "te"}
+{"text": "Can you tell the class teacher she will be late tomorrow?", "intent": "parent_teacher", "lang": "en"}
+{"text": "Who teaches Maths for grade 3?", "intent": "parent_teacher", "lang": "en"}
+{"text": "I want to meet the class teacher.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Please pass a message to the English teacher.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Can I get the class teacher's phone number?", "intent": "parent_teacher", "lang": "en"}
+{"text": "My child will be absent tomorrow because of fever, please inform the teacher.", "intent": "parent_teacher", "lang": "en"}
+{"text": "I'd like to schedule a parent-teacher meeting.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Who is Ananya's class teacher?", "intent": "parent_teacher", "lang": "en"}
+{"text": "Please ask the teacher to call me.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Can the teacher give my son extra help in Science?", "intent": "parent_teacher", "lang": "en"}
+{"text": "My son says another boy keeps pushing him at lunch.", "intent": "parent_teacher", "lang": "en"}
+{"text": "My daughter is being bullied in class.", "intent": "parent_teacher", "lang": "en"}
+{"text": "I have a complaint about the Hindi teacher.", "intent": "parent_teacher", "lang": "en"}
+{"text": "The teacher shouted at my child and I am upset.", "intent": "parent_teacher", "lang": "en"}
+{"text": "My child is scared to go to school, can the teacher look into it?", "intent": "parent_teacher", "lang": "en"}
+{"text": "Please let the teacher know he has a doctor's appointment on Friday.", "intent": "parent_teacher", "lang": "en"}
+{"text": "We are travelling next week, please inform the class teacher about his leave.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Can I talk to the Science teacher about his project?", "intent": "parent_teacher", "lang": "en"}
+{"text": "Tell the teacher my daughter forgot her lunch box.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Who should I contact about my child's behaviour?", "intent": "parent_teacher", "lang": "en"}
+{"text": "My son came home with a bruise, what happened in class?", "intent": "parent_teacher", "lang": "en"}
+{"text": "Can the teacher move my child to the front bench? He can't see the board.", "intent": "parent_teacher", "lang": "en"}
+{"text": "I need to speak with the teacher urgently.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Kindly inform ma'am that Rahul will be picked up early today.", "intent": "parent_teacher", "lang": "en"}
+{"text": "Is the Maths teacher available for a meeting on Saturday?", "intent": "parent_teacher", "lang": "en"}
+{"text": "Class teacher se baat karni hai", "intent": "parent_teacher", "lang": "hinglish"}
+{"text": "Ma'am ko bata dena kal wo late aayegi", "intent": "parent_teacher", "lang": "hinglish"}
+{"text": "Maths kaun padhata hai?", "intent": "parent_teacher", "lang": "hinglish"}
+{"text": "Teacher ka number mil sakta hai?", "intent": "parent_teacher", "lang": "hinglish"}
+{"text": "Koi bachcha mere bete ko tang karta hai", "intent": "parent_teacher", "lang": "hinglish"}
+{"text": "Kal beti ki chutti rahegi, teacher ko inform kar do", "intent": "parent_teacher", "lang": "hinglish"}
+{"text": "मुझे क्लास टीचर से मिलना है।", "intent": "parent_teacher", "lang": "hi"}
+{"text": "कृपया टीचर को बता दें कि वह कल छुट्टी पर रहेगा।", "intent": "parent_teacher", "lang": "hi"}
+{"text": "गणित कौन पढ़ाता है?", "intent": "parent_teacher", "lang": "hi"}
+{"text": "मेरे बच्चे को क्लास में परेशान किया जा रहा है।", "intent": "parent_teacher", "lang": "hi"}
+{"text": "క్లాస్ టీచర్‌తో మాట్లాడాలి.", "intent": "parent_teacher", "lang": "te"}
+{"text": "రేపు మా అమ్మాయికి సెలవు, టీచర్‌కి చెప్పండి.", "intent": "parent_teacher", "lang": "te"}
+{"text": "లెక్కలు ఎవరు చెప్తారు?", "intent": "parent_teacher", "lang": "te"}
+{"text": "మా అబ్బాయిని క్లాస్‌లో ఒకడు కొడుతున్నాడు.", "intent": "parent_teacher", "lang": "te"}
+{"text": "When is the annual day function?", "intent": "communication", "lang": "en"}
+{"text": "Is school open on Saturday?", "intent": "communication", "lang": "en"}
+{"text": "What are the school timings?", "intent": "communication", "lang": "en"}
+{"text": "When is the next holiday?", "intent": "communication", "lang": "en"}
+{"text": "How do I pay the term fees?", "intent": "communication", "lang": "en"}
+{"text": "What is the bus route for Kondapur?", "intent": "communication", "lang": "en"}
+{"text": "Where can I buy the school uniform?", "intent": "communication", "lang": "en"}
+{"text": "What are they learning in Science this month?", "intent": "communication", "lang": "en"}
+{"text": "What topics are covered in the grade 5 EVS curriculum?", "intent": "communication", "lang": "en"}
+{"text": "When does the summer vacation start?", "intent": "communication", "lang": "en"}
+{"text": "Is there a sports day this term?", "intent": "communication", "lang": "en"}
+{"text": "What should my child bring for the field trip?", "intent": "communication", "lang": "en"}
+{"text": "How do I change my WhatsApp number for updates?", "intent": "communication", "lang": "en"}
+{"text": "Can I get updates in Hindi instead of English?", "intent": "communication", "lang": "en"}
+{"text": "Thank you!", "intent": "communication", "lang": "en"}
+{"text": "Hello", "intent": "communication", "lang": "en"}
+{"text": "What is the fee for the after-school dance class?", "intent": "communication", "lang": "en"}
+{"text": "Is the school bus running tomorrow because of the rain?", "intent": "communication", "lang": "en"}
+{"text": "What documents are needed for my younger son's admission?", "intent": "communication", "lang": "en"}
+{"text": "What is the exam timetable for SA1?", "intent": "communication", "lang": "en"}
+{"text": "Does the school have a canteen?", "intent": "communication", "lang": "en"}
+{"text": "How can I get a transfer certificate?", "intent": "communication", "lang": "en"}
+{"text": "Which books do we need for grade 4?", "intent": "communication", "lang": "en"}
+{"text": "Explain what fractions are so I can help him at home.", "intent": "communication", "lang": "en"}
+{"text": "What is the dress code for the Diwali celebration?", "intent": "communication", "lang": "en"}
+{"text": "School kitne baje khulta hai?", "intent": "communication", "lang": "hinglish"}
+{"text": "Agli chutti kab hai?", "intent": "communication", "lang": "hinglish"}
+{"text": "Fees kaise bharni hai?", "intent": "communication", "lang": "hinglish"}
+{"text": "Bus kitne baje aayegi?", "intent": "communication", "lang": "hinglish"}
+{"text": "Is mahine Science mein kya padha rahe hain?", "intent": "communication", "lang": "hinglish"}
+{"text": "Thank you ji", "intent": "communication", "lang": "hinglish"}
+{"text": "स्कूल का समय क्या है?", "intent": "communication", "lang": "hi"}
+{"text": "वार्षिक उत्सव कब है?", "intent": "communication", "lang": "hi"}
+{"text": "फीस कैसे जमा करें?", "intent": "communication", "lang": "hi"}
+{"text": "गर्मी की छुट्टियाँ कब से शुरू होंगी?", "intent": "communication", "lang": "hi"}
+{"text": "స్కూల్ టైమింగ్స్ ఏమిటి?", "intent": "communication", "lang": "te"}
+{"text": "తదుపరి సెలవు ఎప్పుడు?", "intent": "communication", "lang": "te"}
+{"text": "ఫీజు ఎలా కట్టాలి?", "intent": "communication", "lang": "te"}
+{"text": "స్కూల్ బస్ ఎన్ని గంటలకు వస్తుంది?", "intent": "communication", "lang": "te"}
