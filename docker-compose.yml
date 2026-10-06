@@ -9,6 +9,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./ui:/app/ui
+      - ./data:/app/data
 
   db:
     image: pgvector/pgvector:pg16
