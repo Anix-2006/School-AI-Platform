@@ -37,7 +37,7 @@ def test_node_builds_prompt_from_state(monkeypatch):
     system = fake.calls[0][0]
     assert isinstance(system, SystemMessage)
     assert "student_id: s-3-1" in system.content
-    assert "writing to a parent in hi" in system.content
+    assert "writing to a parent in Hindi" in system.content
     assert "never ask which child" in system.content
     assert "No student is selected" not in system.content
     assert result["messages"][-1].content == "I'll share this with the class teacher."

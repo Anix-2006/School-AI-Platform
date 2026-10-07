@@ -31,7 +31,7 @@ def test_attendance_change_in_workbook_is_seen_without_restart(store):
 
 
 def test_attendance_without_record():
-    assert call(tools.get_attendance, student_id=ROHAN, for_date="2026-10-07") == {
+    assert call(tools.get_attendance, student_id=ROHAN, for_date="2030-01-01") == {
         "present": None, "note": "no record",
     }
 

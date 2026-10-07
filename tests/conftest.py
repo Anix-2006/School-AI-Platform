@@ -7,6 +7,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test-key")
 import pytest
 
 SOURCE_WORKBOOK = Path(__file__).resolve().parent.parent / "data" / "school_data.xlsx"
+LOG_SHEETS = ("conversations", "messages", "insight_alerts")
 
 
 @pytest.fixture(autouse=True)
@@ -21,11 +22,20 @@ def no_intent_classifier(monkeypatch):
 @pytest.fixture(autouse=True)
 def workbook(tmp_path, monkeypatch):
     """Every test gets its own copy of data/school_data.xlsx, so writes never
-    touch the real file. Defaults come from the workbook, not from .env."""
+    touch the real file. Log sheets start empty even if the app has been used.
+    Defaults come from the workbook, not from .env."""
+    from openpyxl import load_workbook
+
     from app.config import settings
 
     path = tmp_path / "school_data.xlsx"
     shutil.copy(SOURCE_WORKBOOK, path)
+    wb = load_workbook(path)
+    for name in LOG_SHEETS:
+        if wb[name].max_row > 1:
+            wb[name].delete_rows(2, wb[name].max_row - 1)
+    wb.save(path)
+    wb.close()
     monkeypatch.setattr(settings, "school_data_path", str(path))
     monkeypatch.setattr(settings, "default_tenant_id", "")
     monkeypatch.setattr(settings, "default_teacher_id", "")
