@@ -1,12 +1,17 @@
 """WhatsApp inbound webhook. Meta requires a GET verification handshake
 plus a POST handler for inbound messages."""
 
-from fastapi import APIRouter, Request, Query, HTTPException
-from langchain_core.messages import HumanMessage
+import logging
+
+from fastapi import APIRouter, Body, Query, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
-from app.agents.orchestrator import orchestrator_graph
+from app.services.chat_service import ChatAccessError, resolve_parent, run_parent_turn
+from app.services.excel_store import get_store
 from app.services.whatsapp_service import send_whatsapp_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks/whatsapp", tags=["webhooks"])
 
@@ -22,32 +27,57 @@ def verify_webhook(
     raise HTTPException(status_code=403, detail="verification failed")
 
 
+WEBHOOK_EXAMPLE = {
+    "entry": [{"changes": [{"value": {
+        "metadata": {"phone_number_id": "<whatsapp_phone_number_id from GET /auth/demo-token>"},
+        "messages": [{
+            "from": "<whatsapp_number from GET /guardians>",
+            "type": "text",
+            "text": {"body": "Was my child present today?"},
+        }],
+    }}]}]
+}
+
+
 @router.post("")
-async def receive_message(request: Request):
-    payload = await request.json()
+async def receive_message(
+    payload: dict = Body(
+        ...,
+        description="Meta WhatsApp webhook payload (only the fields read here are shown).",
+        openapi_examples={"text message": {"summary": "Text message from a parent", "value": WEBHOOK_EXAMPLE}},
+    ),
+):
     # NOTE: real payload parsing depends on Meta's webhook schema -
     # this extracts the common case, harden against malformed/edge payloads
     # before production use.
     try:
-        entry = payload["entry"][0]["changes"][0]["value"]
-        message = entry["messages"][0]
+        value = payload["entry"][0]["changes"][0]["value"]
+        phone_number_id = value["metadata"]["phone_number_id"]
+        message = value["messages"][0]
         from_number = message["from"]
         text = message["text"]["body"]
-    except (KeyError, IndexError):
-        return {"status": "ignored"}
+    except (KeyError, IndexError, TypeError):
+        return {"status": "ignored", "reason": "unsupported payload"}
 
-    config = {"configurable": {"thread_id": from_number}}
-    initial_state = {
-        "messages": [HumanMessage(content=text)],
-        "tenant_id": settings.default_tenant_id,  # look up by phone_number_id in production
-        "student_id": None,
-        "guardian_id": from_number,
-        "language": "en",
-        "age_tier": None,
-        "intent": None,
-        "route_to": None,
-    }
-    result = orchestrator_graph.invoke(initial_state, config=config)
-    reply = result["messages"][-1].content
-    await send_whatsapp_message(to=from_number, body=reply)
-    return {"status": "ok"}
+    store = get_store()
+    tenant = store.tenant_for_phone_number_id(phone_number_id)
+    if not tenant:
+        return {"status": "ignored", "reason": "unknown business number"}
+    guardian = store.guardian_by_whatsapp(from_number, tenant["id"])
+    if not guardian:
+        return {"status": "ignored", "reason": "sender is not a registered guardian"}
+    try:
+        guardian, student = resolve_parent(tenant["id"], guardian["id"])
+    except ChatAccessError as exc:
+        logger.info("WhatsApp message from %s not answered: %s", guardian["id"], exc.detail)
+        return {"status": "ignored", "reason": "no consent" if exc.status_code == 403 else "unknown guardian"}
+
+    turn = await run_in_threadpool(
+        run_parent_turn, tenant["id"], guardian, student, text, "whatsapp", f"{guardian['id']}:whatsapp"
+    )
+    sent = await send_whatsapp_message(to=from_number, body=turn["reply"])
+    response = {"status": "ok", "delivery": sent.get("status", "sent")}
+    if settings.env == "development":
+        # Lets the demo WhatsApp page show the reply; Meta ignores the body.
+        response.update(reply=turn["reply"], agent_used=turn["agent_used"])
+    return response

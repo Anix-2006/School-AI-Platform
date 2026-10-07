@@ -26,7 +26,11 @@
 
   <h1>Teacher workspace</h1>
   <p class="lead" id="teacherLead">What to teach today, and who you teach.</p>
-  <p class="note">Roster, timetable, tasks, and syllabus are read from <code>data/teacher_workspace.xlsx</code>. Edit that workbook and refresh this page. Marking a task done writes back to the Tasks sheet.</p>
+  <div class="panel" style="max-width:420px">
+    <label for="teacherSelect">Teacher</label>
+    <select id="teacherSelect"><option value="">Loading…</option></select>
+  </div>
+  <p class="note">Roster, timetable, tasks, and syllabus are read from <code>data/school_data.xlsx</code>. Edit that workbook, save it, and refresh this page. Marking a task done writes back to the teacher_tasks sheet (close the file in Excel first).</p>
   <div id="pageError" class="error" hidden></div>
 
   <div class="stack">
@@ -174,22 +178,27 @@
     }).join("");
   }
 
+  const teacherSelect = document.getElementById("teacherSelect");
+  const teacherId = () => teacherSelect.value;
+
   async function loadTasks() {
-    const tasks = await SchoolAPI.teacherTasks();
+    const tasks = await SchoolAPI.teacherTasks(teacherId());
     renderTasks(tasks);
   }
 
   async function loadAll() {
     err.hidden = true;
+    const id = teacherId();
     const [me, timetable, tasks, syllabus, students] = await Promise.all([
-      SchoolAPI.teacherMe(),
-      SchoolAPI.teacherTimetable(),
-      SchoolAPI.teacherTasks(),
-      SchoolAPI.teacherSyllabus(),
-      SchoolAPI.teacherStudents(),
+      SchoolAPI.teacherMe(id),
+      SchoolAPI.teacherTimetable(id),
+      SchoolAPI.teacherTasks(id),
+      SchoolAPI.teacherSyllabus(id),
+      SchoolAPI.teacherStudents(id),
     ]);
-    document.getElementById("teacherLead").textContent =
-      `${me.name} · ${me.role.replace("_", " ")} · ${(me.subjects || []).map((s) => s.subject).join(", ") || "no subjects"}`;
+    const subjects = [...new Set((me.subjects || []).map((s) => s.subject))].join(", ") || "no subjects";
+    const classTeacher = (me.class_teacher_of || []).length ? ` · class teacher of ${me.class_teacher_of.join(", ")}` : "";
+    document.getElementById("teacherLead").textContent = `${me.name} · ${subjects}${classTeacher}`;
     slots = timetable;
     renderTimetable();
     renderTasks(tasks);
@@ -215,14 +224,25 @@
     if (!btn) return;
     btn.disabled = true;
     try {
-      await SchoolAPI.completeTeacherTask(btn.getAttribute("data-complete"));
+      await SchoolAPI.completeTeacherTask(btn.getAttribute("data-complete"), teacherId());
       await loadTasks();
     } catch (e) {
+      btn.disabled = false;
       showError(e.message);
     }
   });
 
-  loadAll().catch((e) => showError(e.message));
+  teacherSelect.addEventListener("change", () => loadAll().catch((e) => showError(e.message)));
+
+  Promise.all([SchoolAPI.listTeachers(), SchoolAPI.teacherMe()])
+    .then(([teachers, defaultTeacher]) => {
+      teacherSelect.innerHTML = teachers
+        .map((t) => `<option value="${esc(t.id)}">${esc(t.name)}</option>`)
+        .join("");
+      teacherSelect.value = defaultTeacher.id;
+      return loadAll();
+    })
+    .catch((e) => showError(e.message));
 })();
 </script>
 </body>

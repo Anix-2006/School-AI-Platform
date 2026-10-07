@@ -29,15 +29,15 @@ def test_node_builds_prompt_from_state(monkeypatch):
     result = parent_teacher_agent.parent_teacher_node(
         {
             "messages": [HumanMessage(content="Please tell the class teacher she'll be late.")],
-            "student_id": "s1",
+            "student_id": "s-3-1",
             "language": "hi",
         }
     )
 
     system = fake.calls[0][0]
     assert isinstance(system, SystemMessage)
-    assert "student_id: s1" in system.content
-    assert "writing to a parent in hi" in system.content
+    assert "student_id: s-3-1" in system.content
+    assert "writing to a parent in Hindi" in system.content
     assert "never ask which child" in system.content
     assert "No student is selected" not in system.content
     assert result["messages"][-1].content == "I'll share this with the class teacher."
@@ -81,8 +81,8 @@ def test_graph_routes_parent_teacher_to_new_node(monkeypatch):
         {
             "messages": [HumanMessage(content="Can you tell the class teacher she'll be late?")],
             "tenant_id": "demo-school",
-            "student_id": "s1",
-            "guardian_id": "g1",
+            "student_id": "s-3-1",
+            "guardian_id": "g-3-1",
             "language": "en",
             "age_tier": None,
             "intent": None,

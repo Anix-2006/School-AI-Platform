@@ -1,85 +1,68 @@
-"""get_teachers_for_student tool. Run with:
-pytest tests/test_teacher_lookup_tool.py
-Uses an in-memory SQLite database loaded with the teacher demo seed."""
-
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+"""get_teachers_for_student tool, using the demo workbook (temp copy)."""
 
 from app.agents import tools
-from app.database import Base
-from app.models import academic, conversation, student, teacher, tenant  # noqa: F401
-from app.models.teacher import Teacher
-from app.tasks.seed_teachers import seed_teacher_demo
 
-
-@pytest.fixture
-def session_factory(monkeypatch):
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = factory()
-    seed_teacher_demo(db)
-    db.close()
-    monkeypatch.setattr(tools, "SessionLocal", factory)
-    return factory
+ANANYA = "s-3-1"
 
 
 def lookup(**args):
     return tools.get_teachers_for_student.invoke(args)
 
 
-def test_returns_class_and_subject_teachers(session_factory):
-    assert lookup(student_id="s1") == {
+def test_returns_class_and_subject_teachers():
+    assert lookup(student_id=ANANYA) == {
         "teachers": [
-            {"name": "Arjun Rao", "class_teacher": False, "subjects": ["Science"]},
-            {"name": "Priya Sharma", "class_teacher": True, "subjects": ["English", "Math"]},
+            {"name": "Kavita Nair", "class_teacher": True, "subjects": ["Mathematics"]},
+            {"name": "Rajesh Gupta", "class_teacher": False, "subjects": ["English"]},
+            {"name": "Sunita Joshi", "class_teacher": False, "subjects": ["EVS"]},
         ]
     }
 
 
-def test_subject_filter_keeps_class_teacher(session_factory):
-    assert lookup(student_id="s1", subject="science") == {
+def test_subject_filter_keeps_class_teacher():
+    assert lookup(student_id=ANANYA, subject="english") == {
         "teachers": [
-            {"name": "Arjun Rao", "class_teacher": False, "subjects": ["Science"]},
-            {"name": "Priya Sharma", "class_teacher": True, "subjects": []},
+            {"name": "Kavita Nair", "class_teacher": True, "subjects": []},
+            {"name": "Rajesh Gupta", "class_teacher": False, "subjects": ["English"]},
         ]
     }
 
 
-def test_subject_with_no_teacher_returns_class_teacher_and_note(session_factory):
-    assert lookup(student_id="s1", subject="Hindi") == {
-        "teachers": [{"name": "Priya Sharma", "class_teacher": True, "subjects": []}],
+def test_subject_aliases_match():
+    teachers = lookup(student_id=ANANYA, subject="Maths")["teachers"]
+    assert teachers == [{"name": "Kavita Nair", "class_teacher": True, "subjects": ["Mathematics"]}]
+
+
+def test_subject_with_no_teacher_returns_class_teacher_and_note():
+    assert lookup(student_id=ANANYA, subject="Hindi") == {
+        "teachers": [{"name": "Kavita Nair", "class_teacher": True, "subjects": []}],
         "note": "No Hindi teacher is assigned to this student. "
         "The class teacher does not teach this subject.",
     }
 
 
-def test_student_without_assignments_gets_empty_list(session_factory):
-    assert lookup(student_id="s3") == {"teachers": []}
+def test_student_without_assignments_gets_empty_list(store):
+    store.append_row("students", {
+        "id": "test-new", "tenant_id": store.default_tenant_id(), "name": "New Child",
+        "grade": "4", "section": "C", "age_tier": "primary", "active": True,
+    })
+    assert lookup(student_id="test-new") == {"teachers": []}
 
 
-def test_unknown_student(session_factory):
+def test_unknown_student():
     assert lookup(student_id="no-such-student") == {"error": "student not found"}
 
 
-def test_inactive_teachers_are_hidden(session_factory):
-    db = session_factory()
-    db.get(Teacher, "t2").active = False
-    db.commit()
-    db.close()
+def test_inactive_teachers_are_hidden(store):
+    rajesh = next(t for t in store.rows("teachers") if t["name"] == "Rajesh Gupta")
+    store.update_row("teachers", rajesh["id"], {"active": False})
 
-    names = [t["name"] for t in lookup(student_id="s1")["teachers"]]
-    assert names == ["Priya Sharma"]
+    names = [t["name"] for t in lookup(student_id=ANANYA)["teachers"]]
+    assert names == ["Kavita Nair", "Sunita Joshi"]
 
 
-def test_no_contact_details_are_returned(session_factory):
-    for entry in lookup(student_id="s1")["teachers"]:
+def test_no_contact_details_are_returned():
+    for entry in lookup(student_id=ANANYA)["teachers"]:
         assert set(entry) == {"name", "class_teacher", "subjects"}
 
 

@@ -26,6 +26,14 @@
 
   <h1>WhatsApp</h1>
   <p class="lead">WhatsApp channel: parents text the school number; the same orchestrator replies.</p>
+  <div class="panel" style="max-width:420px;margin:0 auto 16px">
+    <label for="waFrom">Send as</label>
+    <select id="waFrom"><option value="">Loading…</option></select>
+    <div id="waCustomWrap" hidden>
+      <label for="waCustom">Phone number</label>
+      <input id="waCustom" placeholder="e.g. 919876543210" autocomplete="off">
+    </div>
+  </div>
   <div class="phone">
     <div class="phone-notch"></div>
     <div class="phone-screen">
@@ -34,12 +42,12 @@
         <div class="bubble bot">Send a WhatsApp-style message about your child.</div>
       </div>
       <div class="phone-compose">
-        <input id="waInput" value="Was Ananya present today?" />
+        <input id="waInput" value="Was my child present on 6 October?" />
         <button type="button" id="waSend">Send</button>
       </div>
     </div>
   </div>
-  <p class="meta" style="text-align:center;margin-top:14px">Uses the chat API with your phone as guardian thread. Outbound WhatsApp stays stubbed until credentials are set.</p>
+  <p class="meta" style="text-align:center;margin-top:14px">Posts a Meta-style message to the WhatsApp webhook. Only registered guardians who have given consent get a reply. Outbound WhatsApp stays stubbed until credentials are set.</p>
   <div id="waError" class="error" hidden style="text-align:center"></div>
 
 </main>
@@ -64,19 +72,37 @@
     thread.appendChild(el);
     thread.scrollTop = thread.scrollHeight;
   }
+  const fromSelect = document.getElementById('waFrom');
+  const customWrap = document.getElementById('waCustomWrap');
+  SchoolAPI.listGuardians().then((guardians) => {
+    fromSelect.innerHTML = guardians
+      .filter((g) => g.whatsapp_number)
+      .map((g) => `<option value="${g.whatsapp_number}">${SchoolAPI.guardianLabel(g)}</option>`)
+      .join('') + '<option value="custom">Someone else (unregistered number)</option>';
+  }).catch((e) => { err.hidden = false; err.textContent = e.message; });
+  fromSelect.addEventListener('change', () => {
+    customWrap.hidden = fromSelect.value !== 'custom';
+    thread.innerHTML = '<div class="bubble bot">Send a WhatsApp-style message about your child.</div>';
+  });
+
   document.getElementById('waSend').addEventListener('click', async () => {
     err.hidden = true;
     const text = document.getElementById('waInput').value.trim();
-    if (!text) return;
+    const from = fromSelect.value === 'custom'
+      ? document.getElementById('waCustom').value.trim()
+      : fromSelect.value;
+    if (!text || !from) return;
     bubble(text, 'user');
     try {
-      const data = await SchoolAPI.chat({
-        guardian_id: '919999999999',
-        student_id: 's1',
-        message: text,
-        language: 'en',
-      });
-      bubble(data.reply || '(no reply)', 'bot', data.agent_used);
+      const data = await SchoolAPI.sendWhatsAppWebhook(from, text);
+      if (data.status === 'ok') {
+        bubble(data.reply || '(reply sent over WhatsApp)', 'bot', data.agent_used);
+      } else {
+        const note = document.createElement('p');
+        note.className = 'meta';
+        note.textContent = `No reply - ${data.reason}.`;
+        thread.appendChild(note);
+      }
     } catch (e) {
       err.hidden = false; err.textContent = e.message;
     }

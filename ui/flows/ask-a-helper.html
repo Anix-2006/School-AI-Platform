@@ -27,15 +27,15 @@
   <h1>Ask a helper</h1>
   <p class="lead">Agent routing: pick the kind of question, send it, and see which specialist answered.</p>
   <div class="helper-pick">
-    <button type="button" class="helper-card selected" data-q="Was Ananya present today? Any homework?">
+    <button type="button" class="helper-card selected" data-q="Was my child present on 6 October? Any homework?">
       <h3>Daily update</h3>
       <p>Attendance, homework, or care log for today.</p>
     </button>
-    <button type="button" class="helper-card" data-q="How did Ananya do in FA1 Mathematics this term?">
+    <button type="button" class="helper-card" data-q="How did my child do in FA1 Mathematics this term?">
       <h3>Academic</h3>
       <p>Marks, rank card, syllabus, or milestones.</p>
     </button>
-    <button type="button" class="helper-card" data-q="Can I meet the class teacher this week about Ananya?">
+    <button type="button" class="helper-card" data-q="Can I meet the class teacher this week?">
       <h3>Parent–teacher</h3>
       <p>Messages, meetings, or concerns for a teacher.</p>
     </button>
@@ -45,10 +45,10 @@
     </button>
   </div>
   <div class="panel">
-    <label for="routeStudent">Student ID</label>
-    <input id="routeStudent" value="s1">
+    <label for="routeGuardian">Parent</label>
+    <select id="routeGuardian"><option value="">Loading…</option></select>
     <label for="routeMessage">Message</label>
-    <textarea id="routeMessage">Was Ananya present today? Any homework?</textarea>
+    <textarea id="routeMessage">Was my child present on 6 October? Any homework?</textarea>
     <div class="actions">
       <button type="button" id="routeSend">Send to orchestrator</button>
     </div>
@@ -64,6 +64,11 @@
 <script>
 (() => {
   const msg = document.getElementById('routeMessage');
+  const guardianSelect = document.getElementById('routeGuardian');
+  SchoolAPI.fillGuardianSelect(guardianSelect).catch((e) => {
+    const err = document.getElementById('routeError');
+    err.hidden = false; err.textContent = e.message;
+  });
   document.querySelectorAll('.helper-card').forEach((card) => {
     card.addEventListener('click', () => {
       document.querySelectorAll('.helper-card').forEach((c) => c.classList.remove('selected'));
@@ -77,11 +82,10 @@
     err.hidden = true; box.hidden = true;
     try {
       const data = await SchoolAPI.chat({
-        // Fresh thread per send so earlier questions don't leak into this one.
-        guardian_id: `g-route-${Date.now()}`,
-        student_id: document.getElementById('routeStudent').value.trim() || null,
+        guardian_id: guardianSelect.value,
         message: msg.value.trim(),
-        language: 'en',
+        // Fresh thread per send so earlier questions don't leak into this one.
+        session_id: `route-${Date.now()}`,
       });
       box.hidden = false;
       const decidedBy = data.intent_source === 'classifier'

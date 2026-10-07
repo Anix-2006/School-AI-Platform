@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage
 
 from app.config import settings
+from app.agents.language import language_name
 from app.agents.state import AgentState
 from app.agents.tools import ACADEMIC_TOOLS
 from app.agents.tool_loop import run_tool_loop
@@ -39,7 +40,7 @@ If data is missing, say so plainly rather than filling a gap."""
 
 def academic_node(state: AgentState) -> dict:
     prompt = SYSTEM_PROMPT.format(
-        language=state.get("language", "en"),
+        language=language_name(state.get("language")),
         student_id=state.get("student_id") or "unknown",
         tenant_id=state.get("tenant_id") or "unknown",
     )

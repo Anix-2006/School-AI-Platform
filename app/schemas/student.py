@@ -1,6 +1,8 @@
 from datetime import date
 from pydantic import BaseModel
 
+AGE_TIERS = ("pre_primary", "primary_lower", "primary")
+
 
 class StudentCreate(BaseModel):
     id: str
@@ -12,5 +14,17 @@ class StudentCreate(BaseModel):
 
 
 class StudentOut(StudentCreate):
-    class Config:
-        from_attributes = True
+    pass
+
+
+class GuardianOut(BaseModel):
+    id: str
+    name: str
+    relation: str | None = None
+    student_id: str
+    student_name: str
+    grade: str
+    section: str | None = None
+    preferred_language: str
+    whatsapp_number: str | None = None
+    has_consent: bool

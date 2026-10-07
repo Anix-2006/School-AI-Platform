@@ -2,11 +2,14 @@ from datetime import datetime, timedelta
 
 from jose import jwt, JWTError
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+bearer_scheme = HTTPBearer(
+    auto_error=False,
+    description="Paste the access_token from GET /auth/demo-token.",
+)
 
 
 def create_access_token(data: dict, expires_minutes: int = 60 * 8) -> str:
@@ -15,12 +18,18 @@ def create_access_token(data: dict, expires_minutes: int = 60 * 8) -> str:
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_token(token: str = Depends(oauth2_scheme)) -> dict:
+def decode_token(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> dict:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        return payload
+        return jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
