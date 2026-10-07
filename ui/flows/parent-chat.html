@@ -29,16 +29,9 @@
   <div class="chat-shell">
     <div class="panel">
       <h3>Context</h3>
-      <label for="guardianId">Guardian ID</label>
-      <input id="guardianId" value="g1">
-      <label for="studentId">Student ID</label>
-      <input id="studentId" value="s1">
-      <label for="language">Language</label>
-      <select id="language">
-        <option value="en" selected>English</option>
-        <option value="hi">Hindi</option>
-        <option value="te">Telugu</option>
-      </select>
+      <label for="guardianId">Parent</label>
+      <select id="guardianId"><option value="">Loading…</option></select>
+      <p class="meta" id="guardianMeta" style="margin-top:8px"></p>
       <p class="meta" id="authMeta" style="margin-top:12px">Connecting…</p>
     </div>
     <div class="chat-thread">
@@ -46,7 +39,7 @@
         <div class="bubble bot">Hi — ask about attendance, homework, marks, or anything school-related.</div>
       </div>
       <div class="chat-compose">
-        <textarea id="message" placeholder="Was Ananya present today?">Was Ananya present today?</textarea>
+        <textarea id="message" placeholder="Was my child present on 6 October?">Was my child present on 6 October?</textarea>
         <div class="actions">
           <button type="button" id="sendBtn">Send message</button>
         </div>
@@ -80,22 +73,41 @@
     messages.scrollTop = messages.scrollHeight;
   }
 
-  SchoolAPI.ensureAuth().then((s) => {
+  const guardianSelect = document.getElementById('guardianId');
+  const guardianMeta = document.getElementById('guardianMeta');
+  let guardians = [];
+  let sessionId = String(Date.now());
+
+  function showGuardian() {
+    const g = guardians.find((x) => x.id === guardianSelect.value);
+    if (!g) { guardianMeta.textContent = ''; return; }
+    guardianMeta.textContent = `Child: ${g.student_name} (${g.student_id}) · Language: ${g.preferred_language}` +
+      (g.has_consent ? '' : ' · No consent - the assistant will refuse to reply');
+  }
+
+  guardianSelect.addEventListener('change', () => {
+    sessionId = String(Date.now());
+    messages.innerHTML = '<div class="bubble bot">New conversation - ask about attendance, homework, marks, or anything school-related.</div>';
+    showGuardian();
+  });
+
+  SchoolAPI.ensureAuth().then(async (s) => {
     authMeta.textContent = 'School: ' + s.tenantId;
+    guardians = await SchoolAPI.fillGuardianSelect(guardianSelect);
+    showGuardian();
   }).catch((e) => { authMeta.textContent = e.message; });
 
   document.getElementById('sendBtn').addEventListener('click', async () => {
     err.hidden = true;
     const message = document.getElementById('message').value.trim();
-    if (!message) return;
+    if (!message || !guardianSelect.value) return;
     addBubble(message, 'user');
     document.getElementById('sendBtn').disabled = true;
     try {
       const data = await SchoolAPI.chat({
-        guardian_id: document.getElementById('guardianId').value.trim(),
-        student_id: document.getElementById('studentId').value.trim() || null,
+        guardian_id: guardianSelect.value,
         message,
-        language: document.getElementById('language').value,
+        session_id: sessionId,
       });
       addBubble(data.reply || '(empty reply)', 'bot', data.agent_used);
     } catch (e) {

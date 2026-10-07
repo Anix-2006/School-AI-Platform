@@ -15,4 +15,4 @@ async def trigger_daily_batch(tenant_id: str = Depends(get_current_tenant)):
 @router.post("/insight-scan")
 def trigger_insight_scan(tenant_id: str = Depends(get_current_tenant)):
     """Manual trigger for the nightly risk-alert scan (local demo)."""
-    return {"alerts": run_insight_scan(tenant_id)}
+    return run_insight_scan(tenant_id)

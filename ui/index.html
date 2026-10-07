@@ -42,21 +42,21 @@
       <div class="row">
         <div>
           <label for="studentId">Student ID</label>
-          <input id="studentId" value="s1" autocomplete="off">
+          <input id="studentId" placeholder="e.g. s-4-1" autocomplete="off">
         </div>
         <div>
           <label for="studentName">Name</label>
-          <input id="studentName" value="Ananya" autocomplete="off">
+          <input id="studentName" placeholder="Full name" autocomplete="off">
         </div>
       </div>
       <div class="row">
         <div>
           <label for="studentGrade">Grade</label>
-          <input id="studentGrade" value="3" autocomplete="off">
+          <input id="studentGrade" placeholder="e.g. 4" autocomplete="off">
         </div>
         <div>
           <label for="studentSection">Section</label>
-          <input id="studentSection" value="A" autocomplete="off">
+          <input id="studentSection" placeholder="e.g. A" autocomplete="off">
         </div>
       </div>
       <label for="ageTier">Age tier</label>
@@ -75,18 +75,10 @@
 
     <div class="panel">
       <h3>Parent chat</h3>
-      <div class="row">
-        <div>
-          <label for="guardianId">Guardian ID</label>
-          <input id="guardianId" value="g1" autocomplete="off">
-        </div>
-        <div>
-          <label for="chatStudentId">Student ID</label>
-          <input id="chatStudentId" value="s1" autocomplete="off">
-        </div>
-      </div>
+      <label for="guardianId">Parent</label>
+      <select id="guardianId"><option value="">Loading…</option></select>
       <label for="chatMessage">Message</label>
-      <textarea id="chatMessage">Was Ananya present today?</textarea>
+      <textarea id="chatMessage">Was my child present on 6 October?</textarea>
       <div class="actions">
         <button type="button" id="sendChatBtn">Send message</button>
       </div>
@@ -161,7 +153,7 @@
       state.tenantId = auth.tenant_id;
       authPill.textContent = `Tenant ${auth.tenant_id}`;
       authPill.classList.remove('bad');
-      await refreshStudents();
+      await Promise.all([refreshStudents(), refreshGuardians()]);
     } catch (err) {
       authPill.textContent = 'Auth failed';
       authPill.classList.add('bad');
@@ -182,6 +174,15 @@
         <div class="meta">${s.id} · grade ${s.grade}${s.section ? s.section : ''} · ${s.age_tier}</div>
       </div>
     `).join('');
+  }
+
+  async function refreshGuardians() {
+    const guardians = await api('/guardians', { auth: true });
+    document.getElementById('guardianId').innerHTML = guardians.map((g) => {
+      const cls = g.section ? `${g.grade}-${g.section}` : g.grade;
+      const consent = g.has_consent ? '' : ' - no consent';
+      return `<option value="${g.id}">${g.name} (${g.relation || 'guardian'} of ${g.student_name}, ${cls})${consent}</option>`;
+    }).join('');
   }
 
   document.getElementById('refreshStudentsBtn').addEventListener('click', async () => {
@@ -205,7 +206,6 @@
         age_tier: document.getElementById('ageTier').value,
       };
       await api('/students', { method: 'POST', body: JSON.stringify(payload), auth: true });
-      document.getElementById('chatStudentId').value = payload.id;
       await refreshStudents();
     } catch (err) {
       setError(studentsError, err.message);
@@ -221,10 +221,8 @@
     btn.disabled = true;
     try {
       const payload = {
-        guardian_id: document.getElementById('guardianId').value.trim(),
-        student_id: document.getElementById('chatStudentId').value.trim() || null,
+        guardian_id: document.getElementById('guardianId').value,
         message: document.getElementById('chatMessage').value.trim(),
-        language: 'en',
       };
       const data = await api('/chat', { method: 'POST', body: JSON.stringify(payload), auth: true });
       chatReply.hidden = false;

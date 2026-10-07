@@ -17,8 +17,8 @@ def test_router_classifies_daily_update():
     state = {
         "messages": [HumanMessage(content="Was my child present today?")],
         "tenant_id": "demo-school",
-        "student_id": "s1",
-        "guardian_id": "g1",
+        "student_id": "s-3-1",
+        "guardian_id": "g-3-1",
         "language": "en",
         "age_tier": "primary",
         "intent": None,

@@ -25,17 +25,17 @@
 <main class="page">
 
   <h1>School records</h1>
-  <p class="lead">Teacher web: students the agents and daily jobs read from (tenant, grade, age tier).</p>
+  <p class="lead">Teacher web: students and parents the agents and daily jobs read from <code>data/school_data.xlsx</code>. New students are added to the students sheet.</p>
   <div class="workspace">
     <div class="panel">
       <h3>Add student</h3>
       <div class="row">
-        <div><label for="sid">Student ID</label><input id="sid" value="s2"></div>
-        <div><label for="sname">Name</label><input id="sname" value="Rahul"></div>
+        <div><label for="sid">Student ID</label><input id="sid" placeholder="e.g. s-4-1"></div>
+        <div><label for="sname">Name</label><input id="sname" placeholder="Full name"></div>
       </div>
       <div class="row">
-        <div><label for="sgrade">Grade</label><input id="sgrade" value="4"></div>
-        <div><label for="ssection">Section</label><input id="ssection" value="B"></div>
+        <div><label for="sgrade">Grade</label><input id="sgrade" placeholder="e.g. 4"></div>
+        <div><label for="ssection">Section</label><input id="ssection" placeholder="e.g. B"></div>
       </div>
       <label for="stier">Age tier</label>
       <select id="stier">
@@ -52,6 +52,10 @@
     <div class="panel">
       <h3>Roster</h3>
       <div id="roster" class="list"><div class="meta">Loading…</div></div>
+    </div>
+    <div class="panel">
+      <h3>Parents</h3>
+      <div id="guardians" class="list"><div class="meta">Loading…</div></div>
     </div>
   </div>
 
@@ -77,6 +81,13 @@
         <div class="meta">${s.id} · grade ${s.grade}${s.section || ''} · ${s.age_tier}</div>
       </div>
     `).join('');
+    const guardians = await SchoolAPI.listGuardians();
+    document.getElementById('guardians').innerHTML = guardians.map((g) => `
+      <div class="list-item">
+        <strong>${g.name}</strong>
+        <div class="meta">${g.id} · ${g.relation || 'guardian'} of ${g.student_name} · language ${g.preferred_language} · ${g.has_consent ? 'consent given' : 'no consent - no messages'}</div>
+      </div>
+    `).join('') || '<div class="meta">No parents yet.</div>';
   }
   document.getElementById('refreshBtn').addEventListener('click', () => refresh().catch((e) => {
     err.hidden = false; err.textContent = e.message;
