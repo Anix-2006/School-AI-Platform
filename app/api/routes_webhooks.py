@@ -3,7 +3,7 @@ plus a POST handler for inbound messages."""
 
 import logging
 
-from fastapi import APIRouter, Request, Query, HTTPException
+from fastapi import APIRouter, Body, Query, HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
@@ -27,9 +27,26 @@ def verify_webhook(
     raise HTTPException(status_code=403, detail="verification failed")
 
 
+WEBHOOK_EXAMPLE = {
+    "entry": [{"changes": [{"value": {
+        "metadata": {"phone_number_id": "<whatsapp_phone_number_id from GET /auth/demo-token>"},
+        "messages": [{
+            "from": "<whatsapp_number from GET /guardians>",
+            "type": "text",
+            "text": {"body": "Was my child present today?"},
+        }],
+    }}]}]
+}
+
+
 @router.post("")
-async def receive_message(request: Request):
-    payload = await request.json()
+async def receive_message(
+    payload: dict = Body(
+        ...,
+        description="Meta WhatsApp webhook payload (only the fields read here are shown).",
+        openapi_examples={"text message": {"summary": "Text message from a parent", "value": WEBHOOK_EXAMPLE}},
+    ),
+):
     # NOTE: real payload parsing depends on Meta's webhook schema -
     # this extracts the common case, harden against malformed/edge payloads
     # before production use.
