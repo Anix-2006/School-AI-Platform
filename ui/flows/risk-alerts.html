@@ -6,10 +6,10 @@
 <title>Risk alerts — School Parent AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="management-body">
 <header class="topbar">
   <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
   <a class="topbar-brand" href="/">School Parent AI</a>
@@ -22,56 +22,149 @@
   </div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
-
-  <h1>Risk alerts</h1>
-  <p class="lead">Admin management view: nightly insight scan for attendance and assessment risk patterns.</p>
-  <div class="panel">
-    <p>Flags clear patterns only (for example several absences in two weeks, or a sharp mark drop between terms).</p>
-    <div class="actions">
-      <button type="button" id="runScan">Run insight scan</button>
+<main class="management-page">
+  <header class="management-hero">
+    <div>
+      <p class="management-eyebrow">Student support</p>
+      <h1>Risk alerts</h1>
+      <p class="lead">Scan recent attendance and assessment data for clear support signals.</p>
     </div>
-    <div id="scanError" class="error" hidden></div>
-  </div>
-  <div class="alert-list" id="alertList">
-    <div class="empty-state">No scan yet — run the insight scan to populate alerts.</div>
-  </div>
+  </header>
 
+  <section class="operation-card" aria-labelledby="scanHeading">
+    <div class="alert-toolbar">
+      <div>
+        <h2 id="scanHeading">Insight scan</h2>
+        <p>Checks absence and mark-drop rules for students in this tenant.</p>
+      </div>
+      <button type="button" id="openScanConfirm">Review and run scan</button>
+    </div>
+    <div class="limitation-note">
+      <strong>Current limitation:</strong> there is no GET endpoint for saved alerts. This page can only show the response from a scan run in this session; it cannot display the full persisted alert history or a reliable open-alert total.
+    </div>
+    <div id="scanLoading" class="state state-loading operation-state" role="status" aria-live="polite" hidden>
+      <div class="progress-row">
+        <strong>Reviewing student records and generating insights…</strong>
+        <progress aria-label="Insight scan in progress"></progress>
+        <span>The service may take extra time to start.</span>
+      </div>
+    </div>
+    <div id="scanError" class="state state-error operation-state" role="alert" hidden>
+      <strong>Insight scan did not complete.</strong>
+      <p id="scanErrorText"></p>
+      <div class="state-actions"><button type="button" id="retryScan">Review and try again</button></div>
+    </div>
+    <div id="saveWarning" class="state state-warning operation-state" role="alert" hidden>
+      The scan completed, but new alerts were not saved. The school data source may be locked. Results below are still the scan response.
+    </div>
+  </section>
+
+  <section aria-labelledby="resultsHeading">
+    <h2 id="resultsHeading">Scan results</h2>
+    <div id="scanIdle" class="state empty-state">No scan has been run in this session.</div>
+    <div id="scanEmpty" class="state empty-state" hidden>No attendance or grade-decline alerts were returned by this scan.</div>
+    <div id="alertList" class="management-alerts" aria-live="polite"></div>
+  </section>
+
+  <dialog class="confirm-dialog" id="scanDialog" aria-labelledby="scanDialogTitle">
+    <form id="scanConfirmForm">
+      <h2 id="scanDialogTitle">Run the insight scan?</h2>
+      <p>The scan sends tenant-scoped student summaries to the configured AI service and may write new open alerts to school storage. Existing open alerts are not duplicated.</p>
+      <div class="dialog-actions">
+        <button type="button" class="secondary" id="cancelScan">Cancel</button>
+        <button type="submit">Run scan now</button>
+      </div>
+    </form>
+  </dialog>
 </main>
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
-document.getElementById('runScan').addEventListener('click', async () => {
-  const err = document.getElementById('scanError');
-  const list = document.getElementById('alertList');
-  err.hidden = true;
-  document.getElementById('runScan').disabled = true;
-  try {
-    const data = await SchoolAPI.runInsightScan();
-    const alerts = data.alerts || [];
-    if (!alerts.length) {
-      list.innerHTML = '<div class="empty-state">No risk alerts for this school right now.</div>';
-    } else {
-      list.innerHTML = alerts.map((a) => `
-        <div class="alert-item">
-          <strong>${a.student_name} (${a.student_id})</strong>
-          <span class="meta">${(a.alert_type || '').replace('_', ' ')} · ${a.severity || ''} · ${a.new ? 'new' : 'already open'}</span>
-          <span>${a.detail || ''}</span>
-        </div>
-      `).join('');
-    }
-    if (!data.saved) {
-      list.insertAdjacentHTML('afterbegin', '<div class="error">Alerts were not saved to the workbook - close data/school_data.xlsx in Excel and run the scan again.</div>');
-    }
-  } catch (e) {
-    err.hidden = false; err.textContent = e.message;
-  } finally {
-    document.getElementById('runScan').disabled = false;
-  }
-});
-</script>
+(() => {
+  "use strict";
+  const runButton = document.getElementById("openScanConfirm");
+  const retry = document.getElementById("retryScan");
+  const dialog = document.getElementById("scanDialog");
+  const form = document.getElementById("scanConfirmForm");
+  const loading = document.getElementById("scanLoading");
+  const errorBox = document.getElementById("scanError");
+  const warning = document.getElementById("saveWarning");
+  const idle = document.getElementById("scanIdle");
+  const empty = document.getElementById("scanEmpty");
+  const list = document.getElementById("alertList");
 
+  function openConfirmation() {
+    if (!runButton.disabled) dialog.showModal();
+  }
+
+  function badge(text, className) {
+    const element = document.createElement("span");
+    element.className = `status-badge ${className}`;
+    element.textContent = text;
+    return element;
+  }
+
+  function addAlert(alert) {
+    const severity = ["low", "medium", "high"].includes(String(alert?.severity).toLowerCase())
+      ? String(alert.severity).toLowerCase()
+      : "medium";
+    const article = document.createElement("article");
+    article.className = `management-alert severity-${severity}`;
+    const header = document.createElement("header");
+    header.className = "alert-header";
+    const titleGroup = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = String(alert?.student_name || "Student");
+    const type = document.createElement("p");
+    type.className = "alert-type";
+    type.textContent = `${String(alert?.alert_type || "risk").replaceAll("_", " ")} · ID ${String(alert?.student_id || "unavailable")}`;
+    titleGroup.append(title, type);
+    const badges = document.createElement("div");
+    badges.className = "badge-row";
+    badges.append(badge(severity, severity), badge(alert?.new ? "New" : "Open", alert?.new ? "new" : "open"));
+    header.append(titleGroup, badges);
+    const detail = document.createElement("p");
+    detail.className = "alert-detail";
+    detail.textContent = String(alert?.detail || "No supporting detail was returned.");
+    article.append(header, detail);
+    list.appendChild(article);
+  }
+
+  async function runScan() {
+    dialog.close();
+    idle.hidden = true;
+    empty.hidden = true;
+    errorBox.hidden = true;
+    warning.hidden = true;
+    list.replaceChildren();
+    loading.hidden = false;
+    runButton.disabled = true;
+    retry.disabled = true;
+    try {
+      const data = await SchoolAPI.runInsightScan();
+      const alerts = Array.isArray(data?.alerts) ? data.alerts : [];
+      alerts.forEach(addAlert);
+      empty.hidden = alerts.length !== 0;
+      warning.hidden = data?.saved !== false;
+    } catch (error) {
+      document.getElementById("scanErrorText").textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      loading.hidden = true;
+      runButton.disabled = false;
+      retry.disabled = false;
+    }
+  }
+
+  runButton.addEventListener("click", openConfirmation);
+  retry.addEventListener("click", openConfirmation);
+  document.getElementById("cancelScan").addEventListener("click", () => dialog.close());
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runScan();
+  });
+})();
+</script>
 </body>
 </html>

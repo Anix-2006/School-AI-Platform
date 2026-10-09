@@ -6,10 +6,10 @@
 <title>Daily updates — School Parent AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="management-body">
 <header class="topbar">
   <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
   <a class="topbar-brand" href="/">School Parent AI</a>
@@ -22,42 +22,147 @@
   </div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
-
-  <h1>Daily updates</h1>
-  <p class="lead">Daily batch job: push today’s summary to every guardian who has given consent.</p>
-  <div class="panel">
-    <p>For each active student, the job finds guardians, skips anyone without <code>consent_given_at</code>, generates a daily update, and sends WhatsApp when a number is on file.</p>
-    <div class="actions">
-      <button type="button" id="runBatch">Run daily batch now</button>
+<main class="management-page">
+  <header class="management-hero">
+    <div>
+      <p class="management-eyebrow">Management operation</p>
+      <h1>Daily updates</h1>
+      <p class="lead">Generate today’s summaries for active students and contact eligible guardians.</p>
     </div>
-    <div id="batchError" class="error" hidden></div>
-    <div id="batchResult" class="result-box" hidden></div>
-  </div>
-  <div class="note">Guardians need consent + a WhatsApp number before anything is sent. Guardians without consent are listed under skipped_without_consent. With no WhatsApp token set, messages are logged instead of sent.</div>
+  </header>
 
+  <div class="operation-grid">
+    <section class="operation-card" aria-labelledby="batchHeading">
+      <h2 id="batchHeading">Run daily batch</h2>
+      <p>This is a live operation. Depending on channel configuration, it can send real WhatsApp messages.</p>
+      <ul class="impact-list">
+        <li>Processes active students in this tenant.</li>
+        <li>Skips guardians without recorded consent.</li>
+        <li>Sends only when a guardian has a WhatsApp number.</li>
+      </ul>
+      <div class="state operation-warning">Check that today’s school records are ready before continuing.</div>
+      <div class="actions"><button type="button" id="openBatchConfirm">Review and run batch</button></div>
+    </section>
+
+    <section aria-labelledby="batchStatusHeading">
+      <h2 class="section-heading" id="batchStatusHeading">Run status</h2>
+      <div id="batchIdle" class="state empty-state">No batch has been run in this session.</div>
+      <div id="batchLoading" class="state state-loading operation-state" role="status" aria-live="polite" hidden>
+        <div class="progress-row">
+          <strong>Generating updates and contacting eligible guardians…</strong>
+          <progress aria-label="Daily batch in progress"></progress>
+          <span>This may take a while if the service is starting or AI responses are delayed.</span>
+        </div>
+      </div>
+      <div id="batchError" class="state state-error operation-state" role="alert" hidden>
+        <strong>Daily batch did not complete.</strong>
+        <p id="batchErrorText"></p>
+        <div class="state-actions"><button type="button" id="retryBatch">Review and try again</button></div>
+      </div>
+      <div id="batchSuccess" class="state state-success operation-state" role="status" aria-live="polite" hidden>
+        <strong>Daily batch completed.</strong>
+        <div class="summary-grid">
+          <div class="summary-item"><strong id="processedCount">0</strong><span>Students processed</span></div>
+          <div class="summary-item"><strong id="sentCount">0</strong><span>Messages sent</span></div>
+          <div class="summary-item"><strong id="skippedCount">0</strong><span>Guardians skipped: no consent</span></div>
+          <div class="summary-item"><strong id="previewCount">0</strong><span>Updates generated</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section id="previewSection" aria-labelledby="previewHeading" hidden>
+    <h2 id="previewHeading">Generated previews</h2>
+    <p class="meta">Preview text is shortened by the service. IDs are shown because names are not included in this response.</p>
+    <div id="previewList" class="preview-list"></div>
+  </section>
+
+  <dialog class="confirm-dialog" id="batchDialog" aria-labelledby="batchDialogTitle">
+    <form id="batchConfirmForm">
+      <h2 id="batchDialogTitle">Run the daily batch?</h2>
+      <p>This may generate AI content and send real messages to every eligible guardian in the current school tenant. This action cannot be undone from this page.</p>
+      <div class="dialog-actions">
+        <button type="button" class="secondary" id="cancelBatch">Cancel</button>
+        <button type="submit">Run batch now</button>
+      </div>
+    </form>
+  </dialog>
 </main>
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
-document.getElementById('runBatch').addEventListener('click', async () => {
-  const err = document.getElementById('batchError');
-  const box = document.getElementById('batchResult');
-  err.hidden = true; box.hidden = true;
-  document.getElementById('runBatch').disabled = true;
-  try {
-    const data = await SchoolAPI.runDailyBatch();
-    box.hidden = false;
-    box.textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    err.hidden = false; err.textContent = e.message;
-  } finally {
-    document.getElementById('runBatch').disabled = false;
-  }
-});
-</script>
+(() => {
+  "use strict";
+  const runButton = document.getElementById("openBatchConfirm");
+  const dialog = document.getElementById("batchDialog");
+  const form = document.getElementById("batchConfirmForm");
+  const cancel = document.getElementById("cancelBatch");
+  const retry = document.getElementById("retryBatch");
+  const idle = document.getElementById("batchIdle");
+  const loading = document.getElementById("batchLoading");
+  const errorBox = document.getElementById("batchError");
+  const success = document.getElementById("batchSuccess");
+  const previews = document.getElementById("previewSection");
+  const previewList = document.getElementById("previewList");
 
+  function openConfirmation() {
+    if (!runButton.disabled) dialog.showModal();
+  }
+
+  function addPreview(item) {
+    const card = document.createElement("article");
+    card.className = "preview-item";
+    const label = document.createElement("strong");
+    label.textContent = `Student ${String(item?.student_id || "unknown")}`;
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    meta.textContent = `Guardian ${String(item?.guardian_id || "unknown")} · Language ${String(item?.language || "not provided")}`;
+    const text = document.createElement("p");
+    text.textContent = String(item?.preview || "No preview text returned.");
+    card.append(label, meta, text);
+    previewList.appendChild(card);
+  }
+
+  async function runBatch() {
+    dialog.close();
+    idle.hidden = true;
+    errorBox.hidden = true;
+    success.hidden = true;
+    previews.hidden = true;
+    previewList.replaceChildren();
+    loading.hidden = false;
+    runButton.disabled = true;
+    retry.disabled = true;
+    try {
+      const data = await SchoolAPI.runDailyBatch();
+      const previewItems = Array.isArray(data?.previews) ? data.previews : [];
+      const skipped = Array.isArray(data?.skipped_without_consent) ? data.skipped_without_consent : [];
+      document.getElementById("processedCount").textContent = String(Number(data?.students_processed) || 0);
+      document.getElementById("sentCount").textContent = String(Number(data?.messages_sent) || 0);
+      document.getElementById("skippedCount").textContent = String(skipped.length);
+      document.getElementById("previewCount").textContent = String(previewItems.length);
+      previewItems.forEach(addPreview);
+      previews.hidden = previewItems.length === 0;
+      success.hidden = false;
+    } catch (error) {
+      document.getElementById("batchErrorText").textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      loading.hidden = true;
+      runButton.disabled = false;
+      retry.disabled = false;
+    }
+  }
+
+  runButton.addEventListener("click", openConfirmation);
+  retry.addEventListener("click", openConfirmation);
+  cancel.addEventListener("click", () => dialog.close());
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    runBatch();
+  });
+})();
+</script>
 </body>
 </html>

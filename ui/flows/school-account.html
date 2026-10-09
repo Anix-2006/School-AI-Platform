@@ -6,10 +6,10 @@
 <title>School account — School Parent AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700;800&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="management-body">
 <header class="topbar">
   <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
   <a class="topbar-brand" href="/">School Parent AI</a>
@@ -22,35 +22,105 @@
   </div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
+<main class="management-page">
+  <header class="management-hero">
+    <div>
+      <p class="management-eyebrow">Configuration</p>
+      <h1>School account</h1>
+      <p class="lead">Review the authenticated school tenant and communication channel status.</p>
+    </div>
+  </header>
 
-  <h1>School account</h1>
-  <p class="lead">Multi-tenant isolation: this session belongs to one school only.</p>
-  <div class="panel">
-    <h3>Current school</h3>
-    <p id="tenantLabel" class="lead" style="margin:0">Loading…</p>
-    <p class="meta">Every student list, chat, daily batch, and insight scan is filtered to this tenant_id.</p>
+  <div id="accountLoading" class="state state-loading" role="status">
+    <div class="progress-row">
+      <strong>Loading authenticated school context…</strong>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+    </div>
   </div>
-  <table>
-    <tr><th>Surface</th><th>What stays school-specific</th></tr>
-    <tr><td>Parent chat</td><td>Answers use only this school’s student records</td></tr>
-    <tr><td>WhatsApp</td><td>Inbound messages handled in this school’s context</td></tr>
-    <tr><td>Daily updates</td><td>Only this school’s consented guardians</td></tr>
-    <tr><td>Risk alerts</td><td>Alerts for this school’s management</td></tr>
-  </table>
+  <div id="accountError" class="state state-error" role="alert" hidden>
+    <strong>School account could not be loaded.</strong>
+    <p id="accountErrorText"></p>
+    <div class="state-actions"><button type="button" id="retryAccount">Try again</button></div>
+  </div>
 
+  <div id="accountContent" hidden>
+    <div class="account-grid">
+      <section class="account-card" aria-labelledby="identityHeading">
+        <h2 id="identityHeading">Authenticated identity</h2>
+        <dl class="account-list">
+          <div class="account-row"><dt>School name</dt><dd id="accountSchool">Unavailable</dd></div>
+          <div class="account-row"><dt>Tenant ID</dt><dd id="accountTenant">Unavailable</dd></div>
+          <div class="account-row"><dt>Session</dt><dd>Authenticated demo session</dd></div>
+        </dl>
+      </section>
+      <section class="account-card" aria-labelledby="channelHeading">
+        <h2 id="channelHeading">Channel configuration</h2>
+        <dl class="account-list">
+          <div class="account-row"><dt>WhatsApp channel</dt><dd id="channelStatus">Checking…</dd></div>
+          <div class="account-row"><dt>Phone number ID</dt><dd id="channelId">Not configured</dd></div>
+          <div class="account-row"><dt>Delivery mode</dt><dd id="deliveryMode">Checking…</dd></div>
+        </dl>
+      </section>
+    </div>
+
+    <section class="privacy-card" aria-labelledby="privacyHeading">
+      <h2 id="privacyHeading">Privacy and security</h2>
+      <ul class="security-list">
+        <li>The tenant ID in the authenticated token scopes student lists, management operations, chats, and alerts to this school.</li>
+        <li>Daily updates skip guardians without recorded consent. Only configured contact channels can receive messages.</li>
+        <li>Channel credentials are not shown here. The phone number ID is masked to avoid exposing the full configuration value.</li>
+        <li>This build uses a local demo token endpoint. Production deployments should use a managed identity provider, short-lived sessions, role-based access, and audit logs.</li>
+      </ul>
+    </section>
+  </div>
 </main>
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
-SchoolAPI.ensureAuth().then((s) => {
-  document.getElementById('tenantLabel').textContent = s.tenantId;
-}).catch((e) => {
-  document.getElementById('tenantLabel').textContent = e.message;
-});
-</script>
+(() => {
+  "use strict";
+  const loading = document.getElementById("accountLoading");
+  const errorBox = document.getElementById("accountError");
+  const content = document.getElementById("accountContent");
+  const retry = document.getElementById("retryAccount");
 
+  function maskIdentifier(value) {
+    const text = String(value || "");
+    if (!text) return "Not configured";
+    if (text.length <= 4) return "••••";
+    return `${"•".repeat(Math.min(8, text.length - 4))}${text.slice(-4)}`;
+  }
+
+  async function loadAccount() {
+    loading.hidden = false;
+    errorBox.hidden = true;
+    content.hidden = true;
+    retry.disabled = true;
+    try {
+      const auth = await SchoolAPI.ensureAuth();
+      const configured = Boolean(auth.whatsappPhoneNumberId);
+      document.getElementById("accountSchool").textContent = auth.schoolName || "School name unavailable";
+      document.getElementById("accountTenant").textContent = auth.tenantId || "Tenant unavailable";
+      document.getElementById("channelStatus").textContent = configured ? "Configured" : "Not configured";
+      document.getElementById("channelId").textContent = maskIdentifier(auth.whatsappPhoneNumberId);
+      document.getElementById("deliveryMode").textContent = configured
+        ? "Channel ID available; credential validity is not exposed"
+        : "Webhook delivery is simulated";
+      content.hidden = false;
+    } catch (error) {
+      document.getElementById("accountErrorText").textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      loading.hidden = true;
+      retry.disabled = false;
+    }
+  }
+
+  retry.addEventListener("click", loadAccount);
+  loadAccount();
+})();
+</script>
 </body>
 </html>
