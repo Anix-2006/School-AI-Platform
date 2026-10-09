@@ -4,7 +4,7 @@ Multi-agent AI system for CBSE schools (Pre-primary through Grade 7) that sends
 parents daily updates, syllabus/academic progress, and rank cards over
 WhatsApp/voice, backed by a LangGraph orchestrator running on OpenAI models.
 
-## Architecture
+## Architecture -
 
 Client (WhatsApp/voice/app) -> FastAPI gateway -> LangGraph orchestrator
 -> specialist agent nodes (daily update, academic, communication, insight)
