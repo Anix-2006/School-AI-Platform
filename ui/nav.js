@@ -1,6 +1,20 @@
 (() => {
   "use strict";
 
+  if (!document.querySelector('link[rel~="icon"]')) {
+    const icon = document.createElement("link");
+    icon.rel = "icon";
+    icon.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23176B5B' d='M8 14 24 6l16 8v20l-16 8-16-8z'/%3E%3Cpath fill='%23FFFDF8' d='M14 18c5 0 8 1 10 3 2-2 5-3 10-3v15c-5 0-8 1-10 3-2-2-5-3-10-3z'/%3E%3C/svg%3E";
+    document.head.appendChild(icon);
+  }
+
+  if (!document.querySelector('link[rel~="icon"]')) {
+    const icon = document.createElement("link");
+    icon.rel = "icon";
+    icon.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23176B5B' d='M8 14 24 6l16 8v20l-16 8-16-8z'/%3E%3Cpath fill='%23FFFDF8' d='M14 18c5 0 8 1 10 3 2-2 5-3 10-3v15c-5 0-8 1-10 3-2-2-5-3-10-3z'/%3E%3C/svg%3E";
+    document.head.appendChild(icon);
+  }
+
   window.APP_NAV = [
     { href: "/", path: "/", label: "Choose a role", home: true },
     { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview", group: "Explore" },
