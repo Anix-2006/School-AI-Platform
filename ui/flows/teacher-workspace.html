@@ -164,6 +164,7 @@
     teacherSelect.disabled = loading;
     controls.forEach((control) => { control.disabled = loading; });
     if (!loading) return;
+    showSkeleton(byId("profile"), 2);
     showSkeleton(byId("timetable"), 4);
     showSkeleton(byId("tasks"), 3);
     showSkeleton(byId("syllabus"), 4);
@@ -392,7 +393,11 @@
     const avatar = element("div", "teacher-avatar", profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join(""));
     const copy = element("div", "profile-copy");
     copy.append(element("p", "eyebrow", profile.role === "class_teacher" ? "Class teacher" : "Subject teacher"), element("h2", "profile-name", profile.name));
-    if (profile.email) copy.append(element("a", "profile-email", profile.email)).href = `mailto:${profile.email}`;
+    if (profile.email) {
+      const email = element("a", "profile-email", profile.email);
+      email.href = `mailto:${profile.email}`;
+      copy.append(email);
+    }
     const facts = element("div", "profile-facts");
     const subjects = [...new Set((profile.subjects || []).map((item) => item.subject))];
     const classes = [...new Set((profile.subjects || []).map((item) => `${item.grade}${item.section ? `-${item.section}` : ""}`))];
@@ -442,18 +447,29 @@
     const task = state.tasks.find((item) => String(item.id) === taskId);
     if (!task || task.status === "done") return;
     const previous = task.status;
+    const selectedTeacher = teacherSelect.value;
     task.status = "done";
     renderTasks();
     toast("Task marked done.");
     try {
-      await SchoolAPI.completeTeacherTask(taskId, teacherSelect.value);
-      state.tasks = await SchoolAPI.teacherTasks(teacherSelect.value);
-      renderTasks();
+      await SchoolAPI.completeTeacherTask(taskId, selectedTeacher);
     } catch (error) {
       task.status = previous;
       renderTasks();
       toast(`Could not save task. ${error.message}`, "error");
-      checkbox?.focus();
+      const restored = [...byId("tasks").querySelectorAll("[data-task-id]")]
+        .find((input) => input.dataset.taskId === taskId);
+      restored?.focus();
+      return;
+    }
+    try {
+      const refreshed = await SchoolAPI.teacherTasks(selectedTeacher);
+      if (teacherSelect.value === selectedTeacher) {
+        state.tasks = refreshed;
+        renderTasks();
+      }
+    } catch (error) {
+      toast("Task saved, but the list could not be refreshed.", "error");
     }
   }
 
