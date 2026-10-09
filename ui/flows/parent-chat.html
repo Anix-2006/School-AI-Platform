@@ -335,6 +335,16 @@
       });
       const preferred = SchoolAPI.normalizeLanguage(contexts[0].preferred_language);
       languageSelect.value = preferred;
+      const sidebarLanguage = document.getElementById("sidebarLanguage");
+      if (sidebarLanguage instanceof HTMLSelectElement) {
+        sidebarLanguage.value = preferred;
+      }
+      document.documentElement.lang = preferred;
+      try {
+        sessionStorage.setItem("school.interfaceLanguage", preferred);
+      } catch {
+        // The selected language still applies when storage is unavailable.
+      }
       document.getElementById("authMeta").textContent =
         auth.schoolName || SchoolAPI.t("schoolConnected", preferred);
       pageState.hidden = true;
