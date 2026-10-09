@@ -43,14 +43,20 @@
   function plainError(status, data, timedOut) {
     if (timedOut) return "The school service is taking longer than expected. Please try again.";
     if (!navigator.onLine) return "You are offline. Check your connection and try again.";
+    let detail = data && typeof data.detail === "string" ? data.detail : "";
+    if (!detail && Array.isArray(data?.detail)) {
+      detail = data.detail.map((issue) => {
+        const field = Array.isArray(issue.loc) ? issue.loc.at(-1) : "";
+        return `${field ? `${field}: ` : ""}${issue.msg || "invalid value"}`;
+      }).join("; ");
+    }
     if (status === 400 || status === 422) {
-      const detail = data && typeof data.detail === "string" ? data.detail : "";
       return detail || "Please check the information and try again.";
     }
     if (status === 401) return "Your session expired. Please try again.";
     if (status === 403) return "You do not have access to this information.";
     if (status === 404) return "That information could not be found.";
-    if (status === 409) return "This change conflicts with existing information.";
+    if (status === 409) return detail || "This change conflicts with existing information.";
     if (status === 429) return "The service is busy. Please wait a moment and try again.";
     if (status >= 500) return "The school service is waking up or temporarily unavailable. Please try again.";
     return "Something went wrong. Please try again.";

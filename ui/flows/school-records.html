@@ -4,112 +4,612 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>School records — School Parent AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="records-body">
+<a class="skip-link" href="#main">Skip to main content</a>
 <header class="topbar">
-  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
   <a class="topbar-brand" href="/">School Parent AI</a>
 </header>
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 <aside class="sidebar" id="sidebar" aria-label="App pages">
   <div class="sidebar-header">
     <h2>Pages</h2>
-    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
   </div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
 
-  <h1>School records</h1>
-  <p class="lead">Teacher web: students and parents the agents and daily jobs read from <code>data/school_data.xlsx</code>. New students are added to the students sheet.</p>
-  <div class="workspace">
-    <div class="panel">
-      <h3>Add student</h3>
-      <div class="row">
-        <div><label for="sid">Student ID</label><input id="sid" placeholder="e.g. s-4-1"></div>
-        <div><label for="sname">Name</label><input id="sname" placeholder="Full name"></div>
-      </div>
-      <div class="row">
-        <div><label for="sgrade">Grade</label><input id="sgrade" placeholder="e.g. 4"></div>
-        <div><label for="ssection">Section</label><input id="ssection" placeholder="e.g. B"></div>
-      </div>
-      <label for="stier">Age tier</label>
-      <select id="stier">
-        <option value="primary" selected>primary</option>
-        <option value="primary_lower">primary_lower</option>
-        <option value="pre_primary">pre_primary</option>
-      </select>
-      <div class="actions">
-        <button type="button" id="createBtn">Create student</button>
-        <button type="button" class="secondary" id="refreshBtn">Refresh</button>
-      </div>
-      <div id="recError" class="error" hidden></div>
+<main class="records-page" id="main">
+  <header class="records-hero">
+    <div>
+      <p class="records-eyebrow">School directory</p>
+      <h1>Records</h1>
+      <p class="lead">Find students and their linked guardians.</p>
     </div>
-    <div class="panel">
-      <h3>Roster</h3>
-      <div id="roster" class="list"><div class="meta">Loading…</div></div>
-    </div>
-    <div class="panel">
-      <h3>Parents</h3>
-      <div id="guardians" class="list"><div class="meta">Loading…</div></div>
-    </div>
-  </div>
+    <button type="button" id="openCreate">
+      <span aria-hidden="true">＋</span> Add student
+    </button>
+  </header>
 
+  <section class="records-shell" aria-labelledby="recordsTitle">
+    <div class="records-tabs" role="tablist" aria-label="Record type">
+      <button type="button" id="studentsTab" class="records-tab active" role="tab" aria-selected="true" aria-controls="recordsPanel" data-view="students">
+        Students <span id="studentCount" class="records-count">0</span>
+      </button>
+      <button type="button" id="guardiansTab" class="records-tab" role="tab" aria-selected="false" aria-controls="recordsPanel" data-view="guardians" tabindex="-1">
+        Guardians <span id="guardianCount" class="records-count">0</span>
+      </button>
+    </div>
+
+    <div class="records-toolbar">
+      <div class="records-search">
+        <label class="sr-only" for="recordSearch">Search records</label>
+        <span aria-hidden="true">⌕</span>
+        <input id="recordSearch" type="search" placeholder="Search name or ID" autocomplete="off">
+      </div>
+      <button type="button" class="secondary filter-toggle" id="filterToggle" aria-expanded="false" aria-controls="filters">
+        Filters <span id="filterCount" class="filter-count" hidden></span>
+      </button>
+      <label class="sort-control" for="recordSort">
+        <span>Sort</span>
+        <select id="recordSort">
+          <option value="newest">Newest first</option>
+          <option value="name-asc">Name A–Z</option>
+          <option value="name-desc">Name Z–A</option>
+          <option value="grade-asc">Grade low–high</option>
+          <option value="grade-desc">Grade high–low</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="records-filters" id="filters" hidden>
+      <label for="gradeFilter">Grade
+        <select id="gradeFilter"><option value="">All grades</option></select>
+      </label>
+      <label for="sectionFilter">Section
+        <select id="sectionFilter"><option value="">All sections</option></select>
+      </label>
+      <label for="tierFilter">Age tier
+        <select id="tierFilter">
+          <option value="">All age tiers</option>
+          <option value="pre_primary">Pre-primary</option>
+          <option value="primary_lower">Lower primary</option>
+          <option value="primary">Primary</option>
+        </select>
+      </label>
+      <button type="button" class="link-button" id="clearFilters">Clear filters</button>
+    </div>
+
+    <div id="recordsPanel" role="tabpanel" aria-labelledby="studentsTab">
+      <h2 class="sr-only" id="recordsTitle">Student records</h2>
+      <div id="recordsStatus" class="records-status" role="status" aria-live="polite"></div>
+      <div id="recordsError" class="state state-error records-error" role="alert" hidden>
+        <span id="recordsErrorText">Records could not be loaded.</span>
+        <button type="button" class="secondary" id="retryRecords">Try again</button>
+      </div>
+      <div id="recordsEmpty" class="records-empty" hidden>
+        <span class="empty-icon" aria-hidden="true">⌕</span>
+        <h2 id="emptyTitle">No records found</h2>
+        <p id="emptyText">Try changing your search or filters.</p>
+      </div>
+      <div id="recordsContent" hidden>
+        <div class="records-table-wrap">
+          <table class="records-table">
+            <thead id="recordsHead"></thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+        </div>
+        <div id="recordsCards" class="records-cards"></div>
+        <nav class="records-pagination" aria-label="Records pages">
+          <p id="pageSummary"></p>
+          <div>
+            <button type="button" class="secondary page-button" id="prevPage">Previous</button>
+            <span id="pageNumber" aria-live="polite"></span>
+            <button type="button" class="secondary page-button" id="nextPage">Next</button>
+          </div>
+        </nav>
+      </div>
+    </div>
+  </section>
 </main>
+
+<dialog class="student-dialog" id="studentDialog" aria-labelledby="dialogTitle">
+  <form id="studentForm" novalidate>
+    <header class="dialog-header">
+      <div>
+        <p class="records-eyebrow">New record</p>
+        <h2 id="dialogTitle">Add student</h2>
+        <p>Enter the student’s school details.</p>
+      </div>
+      <button type="button" class="dialog-close" id="closeCreate" aria-label="Close add student form">×</button>
+    </header>
+
+    <div id="formError" class="state state-error form-error" role="alert" tabindex="-1" hidden></div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="sid">Student ID <span aria-hidden="true">*</span></label>
+        <input id="sid" name="id" autocomplete="off" required aria-describedby="sidHint sidError">
+        <span class="field-hint" id="sidHint">For example, s-4-1</span>
+        <span class="field-error" id="sidError"></span>
+      </div>
+      <div class="field">
+        <label for="sname">Full name <span aria-hidden="true">*</span></label>
+        <input id="sname" name="name" autocomplete="name" required aria-describedby="snameError">
+        <span class="field-error" id="snameError"></span>
+      </div>
+      <div class="field">
+        <label for="sgrade">Grade <span aria-hidden="true">*</span></label>
+        <input id="sgrade" name="grade" autocomplete="off" required aria-describedby="sgradeError">
+        <span class="field-error" id="sgradeError"></span>
+      </div>
+      <div class="field">
+        <label for="ssection">Section</label>
+        <input id="ssection" name="section" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="stier">Age tier <span aria-hidden="true">*</span></label>
+        <select id="stier" name="age_tier" required aria-describedby="stierError">
+          <option value="pre_primary">Pre-primary</option>
+          <option value="primary_lower">Lower primary</option>
+          <option value="primary" selected>Primary</option>
+        </select>
+        <span class="field-error" id="stierError"></span>
+      </div>
+      <div class="field">
+        <label for="sdob">Date of birth</label>
+        <input id="sdob" name="date_of_birth" type="date" aria-describedby="sdobHint sdobError">
+        <span class="field-hint" id="sdobHint">YYYY-MM-DD</span>
+        <span class="field-error" id="sdobError"></span>
+      </div>
+    </div>
+    <footer class="dialog-actions">
+      <button type="button" class="secondary" id="cancelCreate">Cancel</button>
+      <button type="submit" id="submitCreate">Create student</button>
+    </footer>
+  </form>
+</dialog>
+
+<div id="toast" class="records-toast" role="status" aria-live="polite" hidden></div>
+
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
 (() => {
-  const roster = document.getElementById('roster');
-  const err = document.getElementById('recError');
-  async function refresh() {
-    err.hidden = true;
-    const students = await SchoolAPI.listStudents();
-    if (!students.length) {
-      roster.innerHTML = '<div class="meta">No students yet.</div>';
-      return;
-    }
-    roster.innerHTML = students.map((s) => `
-      <div class="list-item">
-        <strong>${s.name}</strong>
-        <div class="meta">${s.id} · grade ${s.grade}${s.section || ''} · ${s.age_tier}</div>
-      </div>
-    `).join('');
-    const guardians = await SchoolAPI.listGuardians();
-    document.getElementById('guardians').innerHTML = guardians.map((g) => `
-      <div class="list-item">
-        <strong>${g.name}</strong>
-        <div class="meta">${g.id} · ${g.relation || 'guardian'} of ${g.student_name} · language ${g.preferred_language} · ${g.has_consent ? 'consent given' : 'no consent - no messages'}</div>
-      </div>
-    `).join('') || '<div class="meta">No parents yet.</div>';
+  "use strict";
+
+  const PAGE_SIZE = 8;
+  const VALID_TIERS = ["pre_primary", "primary_lower", "primary"];
+  const state = {
+    view: "students",
+    students: [],
+    guardians: [],
+    page: 1,
+    loading: true,
+  };
+  const byId = (id) => document.getElementById(id);
+  const elements = {
+    panel: byId("recordsPanel"),
+    status: byId("recordsStatus"),
+    error: byId("recordsError"),
+    errorText: byId("recordsErrorText"),
+    empty: byId("recordsEmpty"),
+    emptyTitle: byId("emptyTitle"),
+    emptyText: byId("emptyText"),
+    content: byId("recordsContent"),
+    head: byId("recordsHead"),
+    body: byId("recordsBody"),
+    cards: byId("recordsCards"),
+    search: byId("recordSearch"),
+    sort: byId("recordSort"),
+    grade: byId("gradeFilter"),
+    section: byId("sectionFilter"),
+    tier: byId("tierFilter"),
+    filters: byId("filters"),
+    dialog: byId("studentDialog"),
+    form: byId("studentForm"),
+    formError: byId("formError"),
+    submit: byId("submitCreate"),
+    toast: byId("toast"),
+  };
+
+  function textElement(tag, text, className) {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = String(text ?? "");
+    return element;
   }
-  document.getElementById('refreshBtn').addEventListener('click', () => refresh().catch((e) => {
-    err.hidden = false; err.textContent = e.message;
-  }));
-  document.getElementById('createBtn').addEventListener('click', async () => {
-    err.hidden = true;
-    try {
-      await SchoolAPI.createStudent({
-        id: document.getElementById('sid').value.trim(),
-        name: document.getElementById('sname').value.trim(),
-        grade: document.getElementById('sgrade').value.trim(),
-        section: document.getElementById('ssection').value.trim() || null,
-        age_tier: document.getElementById('stier').value,
+
+  function tierLabel(value) {
+    return {
+      pre_primary: "Pre-primary",
+      primary_lower: "Lower primary",
+      primary: "Primary",
+    }[value] || String(value || "Not set");
+  }
+
+  function classLabel(record) {
+    return `Grade ${record.grade || "—"}${record.section ? ` · ${record.section}` : ""}`;
+  }
+
+  function maskPhone(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (!digits) return "Not provided";
+    const suffix = digits.slice(-3).padStart(3, "•");
+    const country = digits.length > 10 ? `+${digits.slice(0, -10)} ` : "+91 ";
+    return `${country}••••• ••${suffix}`;
+  }
+
+  function badge(text, tone) {
+    return textElement("span", text, `record-badge ${tone || ""}`.trim());
+  }
+
+  function setLoading() {
+    state.loading = true;
+    elements.error.hidden = true;
+    elements.empty.hidden = true;
+    elements.content.hidden = true;
+    elements.status.replaceChildren();
+    const skeletons = document.createElement("div");
+    skeletons.className = "records-skeletons";
+    for (let index = 0; index < 5; index += 1) {
+      skeletons.append(textElement("div", "", "skeleton record-skeleton"));
+    }
+    elements.status.append(skeletons);
+  }
+
+  function fillSelect(select, values, label) {
+    const current = select.value;
+    select.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = `All ${label}`;
+    select.append(all);
+    values.forEach((value) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      select.append(option);
+    });
+    select.value = values.includes(current) ? current : "";
+  }
+
+  function refreshFilterOptions() {
+    const grades = [...new Set(state.students.map((item) => String(item.grade || "")).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const sections = [...new Set(state.students.map((item) => String(item.section || "")).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    fillSelect(elements.grade, grades, "grades");
+    fillSelect(elements.section, sections, "sections");
+  }
+
+  function joinedRecords() {
+    if (state.view === "students") {
+      return state.students.map((student, index) => ({ ...student, _order: index }));
+    }
+    const students = new Map(state.students.map((student) => [String(student.id), student]));
+    return state.guardians.map((guardian, index) => {
+      const student = students.get(String(guardian.student_id)) || {};
+      return { ...guardian, age_tier: student.age_tier || "", _order: index };
+    });
+  }
+
+  function visibleRecords() {
+    const query = elements.search.value.trim().toLocaleLowerCase();
+    const filtered = joinedRecords().filter((record) => {
+      const searchValues = state.view === "students"
+        ? [record.name, record.id, record.grade, record.section]
+        : [record.name, record.id, record.student_name, record.student_id, record.relation];
+      return (!query || searchValues.some((value) => String(value || "").toLocaleLowerCase().includes(query)))
+        && (!elements.grade.value || String(record.grade) === elements.grade.value)
+        && (!elements.section.value || String(record.section || "") === elements.section.value)
+        && (!elements.tier.value || record.age_tier === elements.tier.value);
+    });
+    const [sortKey, direction] = elements.sort.value.split("-");
+    filtered.sort((a, b) => {
+      if (sortKey === "newest") return b._order - a._order;
+      const left = String(sortKey === "name" ? a.name : a.grade || "");
+      const right = String(sortKey === "name" ? b.name : b.grade || "");
+      const result = left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+      return direction === "desc" ? -result : result;
+    });
+    return filtered;
+  }
+
+  function studentCells(record) {
+    return [
+      { label: "Student", value: record.name, detail: record.id },
+      { label: "Class", value: classLabel(record) },
+      { label: "Age tier", node: badge(tierLabel(record.age_tier), "neutral") },
+      { label: "Date of birth", value: record.date_of_birth || "Not provided" },
+    ];
+  }
+
+  function guardianCells(record) {
+    const consent = record.has_consent
+      ? badge("Consent given", "success")
+      : badge("No consent", "warning");
+    const language = badge(String(record.preferred_language || "en").toUpperCase(), "neutral");
+    const badgeGroup = document.createElement("div");
+    badgeGroup.className = "record-badges";
+    badgeGroup.append(consent, language);
+    return [
+      { label: "Guardian", value: record.name, detail: record.relation || "Guardian" },
+      { label: "Student", value: record.student_name, detail: classLabel(record) },
+      { label: "Phone", value: maskPhone(record.whatsapp_number), className: "masked-phone" },
+      { label: "Preferences", node: badgeGroup },
+    ];
+  }
+
+  function renderTable(records) {
+    const labels = state.view === "students"
+      ? ["Student", "Class", "Age tier", "Date of birth"]
+      : ["Guardian", "Student", "Phone", "Preferences"];
+    const row = document.createElement("tr");
+    labels.forEach((label) => row.append(textElement("th", label)));
+    elements.head.replaceChildren(row);
+    elements.body.replaceChildren();
+    records.forEach((record) => {
+      const tableRow = document.createElement("tr");
+      const cells = state.view === "students" ? studentCells(record) : guardianCells(record);
+      cells.forEach((cell) => {
+        const tableCell = document.createElement("td");
+        if (cell.className) tableCell.className = cell.className;
+        if (cell.node) {
+          tableCell.append(cell.node);
+        } else {
+          tableCell.append(textElement("strong", cell.value));
+          if (cell.detail) tableCell.append(textElement("span", cell.detail, "cell-detail"));
+        }
+        tableRow.append(tableCell);
       });
-      await refresh();
-    } catch (e) {
-      err.hidden = false; err.textContent = e.message;
+      elements.body.append(tableRow);
+    });
+  }
+
+  function renderCards(records) {
+    elements.cards.replaceChildren();
+    records.forEach((record) => {
+      const card = document.createElement("article");
+      card.className = "record-card";
+      const cells = state.view === "students" ? studentCells(record) : guardianCells(record);
+      cells.forEach((cell, index) => {
+        const field = document.createElement("div");
+        field.className = index === 0 ? "record-card-main" : "record-card-field";
+        field.append(textElement(index === 0 ? "h3" : "span", cell.label, "record-card-label"));
+        if (cell.node) {
+          field.append(cell.node);
+        } else {
+          field.append(textElement("strong", cell.value, cell.className));
+          if (cell.detail) field.append(textElement("span", cell.detail, "cell-detail"));
+        }
+        card.append(field);
+      });
+      elements.cards.append(card);
+    });
+  }
+
+  function updateFilterCount() {
+    const count = [elements.grade.value, elements.section.value, elements.tier.value].filter(Boolean).length;
+    const countElement = byId("filterCount");
+    countElement.hidden = count === 0;
+    countElement.textContent = String(count);
+  }
+
+  function render() {
+    if (state.loading) return;
+    const all = visibleRecords();
+    const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+    state.page = Math.min(state.page, pages);
+    const start = (state.page - 1) * PAGE_SIZE;
+    const pageRecords = all.slice(start, start + PAGE_SIZE);
+    elements.status.replaceChildren();
+    elements.error.hidden = true;
+    elements.empty.hidden = all.length !== 0;
+    elements.content.hidden = all.length === 0;
+    if (!all.length) {
+      const hasCriteria = elements.search.value.trim()
+        || elements.grade.value || elements.section.value || elements.tier.value;
+      elements.emptyTitle.textContent = hasCriteria ? "No matching records" : `No ${state.view} yet`;
+      elements.emptyText.textContent = hasCriteria
+        ? "Try changing your search or filters."
+        : `New ${state.view} will appear here.`;
+    } else {
+      renderTable(pageRecords);
+      renderCards(pageRecords);
+      byId("pageSummary").textContent = `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, all.length)} of ${all.length}`;
+      byId("pageNumber").textContent = `Page ${state.page} of ${pages}`;
+      byId("prevPage").disabled = state.page === 1;
+      byId("nextPage").disabled = state.page === pages;
+    }
+    updateFilterCount();
+  }
+
+  async function loadRecords() {
+    setLoading();
+    try {
+      const [students, guardians] = await Promise.all([
+        SchoolAPI.listStudents(),
+        SchoolAPI.listGuardians(),
+      ]);
+      state.students = Array.isArray(students) ? students : [];
+      state.guardians = Array.isArray(guardians) ? guardians : [];
+      byId("studentCount").textContent = String(state.students.length);
+      byId("guardianCount").textContent = String(state.guardians.length);
+      refreshFilterOptions();
+      state.loading = false;
+      render();
+    } catch (error) {
+      state.loading = false;
+      elements.status.replaceChildren();
+      elements.content.hidden = true;
+      elements.empty.hidden = true;
+      elements.error.hidden = false;
+      elements.errorText.textContent = error.message;
+    }
+  }
+
+  function switchView(view) {
+    state.view = view;
+    state.page = 1;
+    document.querySelectorAll(".records-tab").forEach((tab) => {
+      const selected = tab.dataset.view === view;
+      tab.classList.toggle("active", selected);
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    elements.panel.setAttribute("aria-labelledby", `${view}Tab`);
+    byId("recordsTitle").textContent = `${view === "students" ? "Student" : "Guardian"} records`;
+    elements.search.placeholder = view === "students"
+      ? "Search student name or ID"
+      : "Search guardian or student";
+    render();
+  }
+
+  function showFieldError(id, message) {
+    const input = byId(id);
+    const error = byId(`${id}Error`);
+    error.textContent = message;
+    input.setAttribute("aria-invalid", "true");
+  }
+
+  function clearFormErrors() {
+    elements.formError.hidden = true;
+    elements.formError.textContent = "";
+    ["sid", "sname", "sgrade", "stier", "sdob"].forEach((id) => {
+      byId(id).removeAttribute("aria-invalid");
+      byId(`${id}Error`).textContent = "";
+    });
+  }
+
+  function validateForm() {
+    clearFormErrors();
+    let firstInvalid = null;
+    [["sid", "Student ID"], ["sname", "Full name"], ["sgrade", "Grade"]].forEach(([id, label]) => {
+      const value = byId(id).value.trim();
+      let message = "";
+      if (!value) message = `${label} is required.`;
+      else if (value.startsWith("=")) message = `${label} must not start with “=”.`;
+      if (message) {
+        showFieldError(id, message);
+        firstInvalid ||= byId(id);
+      }
+    });
+    if (!VALID_TIERS.includes(byId("stier").value)) {
+      showFieldError("stier", "Choose a valid age tier.");
+      firstInvalid ||= byId("stier");
+    }
+    const date = byId("sdob").value;
+    if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      showFieldError("sdob", "Use the date format YYYY-MM-DD.");
+      firstInvalid ||= byId("sdob");
+    }
+    firstInvalid?.focus();
+    return !firstInvalid;
+  }
+
+  function closeDialog() {
+    elements.dialog.close();
+  }
+
+  function showToast(message) {
+    elements.toast.textContent = message;
+    elements.toast.hidden = false;
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => {
+      elements.toast.hidden = true;
+    }, 4000);
+  }
+
+  document.querySelectorAll(".records-tab").forEach((tab) => {
+    tab.addEventListener("click", () => switchView(tab.dataset.view));
+    tab.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      const next = state.view === "students" ? "guardians" : "students";
+      switchView(next);
+      byId(`${next}Tab`).focus();
+    });
+  });
+
+  [elements.search, elements.sort, elements.grade, elements.section, elements.tier].forEach((control) => {
+    control.addEventListener(control === elements.search ? "input" : "change", () => {
+      state.page = 1;
+      render();
+    });
+  });
+  byId("filterToggle").addEventListener("click", () => {
+    const expanded = byId("filterToggle").getAttribute("aria-expanded") === "true";
+    byId("filterToggle").setAttribute("aria-expanded", String(!expanded));
+    elements.filters.hidden = expanded;
+  });
+  byId("clearFilters").addEventListener("click", () => {
+    elements.grade.value = "";
+    elements.section.value = "";
+    elements.tier.value = "";
+    state.page = 1;
+    render();
+  });
+  byId("prevPage").addEventListener("click", () => {
+    state.page -= 1;
+    render();
+  });
+  byId("nextPage").addEventListener("click", () => {
+    state.page += 1;
+    render();
+  });
+  byId("retryRecords").addEventListener("click", loadRecords);
+
+  byId("openCreate").addEventListener("click", () => {
+    elements.form.reset();
+    clearFormErrors();
+    elements.dialog.showModal();
+    window.requestAnimationFrame(() => byId("sid").focus());
+  });
+  byId("closeCreate").addEventListener("click", closeDialog);
+  byId("cancelCreate").addEventListener("click", closeDialog);
+  elements.dialog.addEventListener("click", (event) => {
+    if (event.target === elements.dialog) closeDialog();
+  });
+  elements.form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!validateForm()) return;
+    elements.submit.disabled = true;
+    elements.submit.textContent = "Creating…";
+    try {
+      const payload = {
+        id: byId("sid").value.trim(),
+        name: byId("sname").value.trim(),
+        grade: byId("sgrade").value.trim(),
+        section: byId("ssection").value.trim() || null,
+        age_tier: byId("stier").value,
+        date_of_birth: byId("sdob").value || null,
+      };
+      await SchoolAPI.createStudent(payload);
+      closeDialog();
+      await loadRecords();
+      switchView("students");
+      showToast(`${payload.name} was added successfully.`);
+    } catch (error) {
+      elements.formError.hidden = false;
+      elements.formError.textContent = error.status === 409
+        ? "That Student ID already exists. Use a different ID."
+        : error.message;
+      elements.formError.focus();
+    } finally {
+      elements.submit.disabled = false;
+      elements.submit.textContent = "Create student";
     }
   });
-  refresh().catch((e) => { roster.innerHTML = '<div class="meta">' + e.message + '</div>'; });
+
+  loadRecords();
 })();
 </script>
-
 </body>
 </html>
