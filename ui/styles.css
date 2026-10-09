@@ -1343,6 +1343,8 @@ button.secondary:hover {
 }
 .update-action:hover { color: #fff; }
 
+.parent-desktop-quick-actions { display: none; }
+
 .availability-note {
   padding: 10px 12px;
   color: var(--muted) !important;
@@ -2644,6 +2646,144 @@ button.secondary:hover {
       max(24px, (100vw - var(--desktop-sidebar-width) - 80rem) / 2)
     );
   }
+
+  /* Desktop role chooser */
+  body > main.entry-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 48px), 70rem);
+    max-width: 70rem;
+  }
+
+  .entry-hero {
+    max-width: 42rem;
+    margin-inline: auto;
+    padding-top: 32px;
+    text-align: center;
+  }
+
+  .entry-hero .status-row { justify-content: center; }
+
+  .role-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-width: 68rem;
+    margin: 22px auto 0;
+  }
+
+  .role-card { min-height: 190px; }
+
+  /* Desktop parent workspace */
+  body > main.parent-page {
+    display: grid;
+    grid-template-columns: minmax(22rem, 24rem) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    gap: 16px 20px;
+    min-height: calc(100dvh - 72px);
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .parent-page .child-header {
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    padding: 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .parent-page .child-switcher { grid-column: 1 / -1; }
+  .parent-page > .state { grid-column: 2; grid-row: 1; }
+  .parent-page .parent-layout { display: contents; }
+
+  .parent-page .parent-chat-card {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+    height: calc(100dvh - 112px);
+    min-height: 36rem;
+  }
+
+  .parent-page .updates-card {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    min-width: 0;
+  }
+
+  .parent-chat-card > .quick-actions { display: none; }
+
+  .parent-desktop-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0 2px;
+  }
+
+  .parent-desktop-quick-actions .quick-action {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .parent-messages {
+    min-height: 0;
+    padding: 22px;
+  }
+
+  .parent-chat-card .bubble { max-width: 70%; }
+  .parent-chat-card .retry-row,
+  .parent-chat-card .print-response { order: 3; }
+  .parent-chat-card .parent-compose { order: 4; }
+
+  /* Desktop helper workspace */
+  body > main.helper-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 48px), 72rem);
+    max-width: 72rem;
+  }
+
+  #helperExperience {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(22rem, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  #helperExperience .helper-pick {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+  }
+
+  #helperExperience .helper-card { min-height: 10rem; }
+  #helperExperience .helper-compose {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  /* Desktop WhatsApp preview */
+  body > main.whatsapp-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 48px), 58rem);
+    max-width: 58rem;
+  }
+
+  .whatsapp-page .parent-page-heading,
+  .whatsapp-layout {
+    max-width: 52rem;
+    margin-inline: auto;
+  }
+
+  .whatsapp-layout {
+    grid-template-columns: minmax(16rem, 24rem) 22.5rem;
+    justify-content: center;
+    gap: 24px;
+  }
+
+  .whatsapp-layout .sender-panel { width: 100%; }
+  .whatsapp-layout .phone {
+    width: 22.5rem;
+    max-width: 100%;
+  }
 }
 
 @media (min-width: 1440px) {
@@ -2654,6 +2794,33 @@ button.secondary:hover {
     margin-left: calc(
       var(--desktop-sidebar-width) +
       max(40px, (100vw - var(--desktop-sidebar-width) - 80rem) / 2)
+    );
+  }
+
+  body > main.entry-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 80px), 70rem);
+    max-width: 70rem;
+    margin-left: calc(
+      var(--desktop-sidebar-width) +
+      max(40px, (100vw - var(--desktop-sidebar-width) - 70rem) / 2)
+    );
+  }
+
+  body > main.helper-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 80px), 72rem);
+    max-width: 72rem;
+    margin-left: calc(
+      var(--desktop-sidebar-width) +
+      max(40px, (100vw - var(--desktop-sidebar-width) - 72rem) / 2)
+    );
+  }
+
+  body > main.whatsapp-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 80px), 58rem);
+    max-width: 58rem;
+    margin-left: calc(
+      var(--desktop-sidebar-width) +
+      max(40px, (100vw - var(--desktop-sidebar-width) - 58rem) / 2)
     );
   }
 }
