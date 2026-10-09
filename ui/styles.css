@@ -2455,3 +2455,205 @@ button.secondary:hover {
   .metric-grid,
   .summary-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Desktop shell: mobile and tablet behavior remains unchanged below 1024px. */
+.sidebar-brand,
+.sidebar-footer,
+.desktop-topbar-title,
+.desktop-topbar-meta {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  :root { --desktop-sidebar-width: 17rem; }
+
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .sidebar {
+    display: flex;
+    width: var(--desktop-sidebar-width);
+    padding: 22px 18px 24px;
+    visibility: visible;
+    transform: none;
+    transition: none;
+    flex-direction: column;
+    box-shadow: 8px 0 28px rgba(23, 51, 46, 0.08);
+  }
+
+  .sidebar-header {
+    display: block;
+    margin-bottom: 18px;
+  }
+
+  .sidebar-header > h2,
+  .close-btn,
+  .sidebar-backdrop,
+  .menu-btn {
+    display: none !important;
+  }
+
+  .sidebar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 48px;
+    color: var(--ink);
+    font-family: "Noto Serif", Georgia, serif;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-decoration: none;
+  }
+
+  .sidebar-brand:hover { color: var(--accent); }
+  .sidebar-brand .brand-mark { width: 38px; height: 38px; }
+
+  #app-nav {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .sidebar nav a,
+  .sidebar-home {
+    margin-bottom: 3px;
+    padding: 9px 12px;
+  }
+
+  .sidebar nav a:hover,
+  .sidebar-home:hover {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+  }
+
+  .sidebar-group { margin-top: 14px; }
+
+  .sidebar-footer {
+    display: grid;
+    gap: 5px;
+    margin-top: auto;
+    padding: 16px 12px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .sidebar-footer-label {
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .sidebar-footer strong {
+    margin-bottom: 8px;
+    color: var(--ink);
+    font-size: 14px;
+  }
+
+  .sidebar-language {
+    min-width: 0;
+    min-height: 40px;
+    padding-block: 6px;
+    background: #fff;
+  }
+
+  .topbar {
+    width: calc(100% - var(--desktop-sidebar-width));
+    min-height: 72px;
+    margin-left: var(--desktop-sidebar-width);
+    padding: 10px 28px;
+    gap: 22px;
+  }
+
+  .topbar-brand,
+  .topbar > .language-select,
+  .topbar > label.sr-only,
+  .topbar-spacer {
+    display: none;
+  }
+
+  .desktop-topbar-title {
+    display: grid;
+    order: 1;
+    min-width: 0;
+    margin-right: auto;
+    line-height: 1.25;
+  }
+
+  .desktop-topbar-title span {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .desktop-topbar-title strong {
+    overflow: hidden;
+    font-family: "Noto Serif", Georgia, serif;
+    font-size: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .docs-link { order: 2; }
+
+  .desktop-topbar-meta {
+    display: flex;
+    order: 3;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .desktop-school-name {
+    overflow: hidden;
+    max-width: 18rem;
+    color: var(--muted);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-role-select {
+    width: auto;
+    min-width: 9rem;
+    min-height: 40px;
+    padding-block: 6px;
+    background: var(--panel);
+  }
+
+  .connection-banner {
+    top: 72px;
+    width: calc(100% - var(--desktop-sidebar-width));
+    margin-left: var(--desktop-sidebar-width);
+  }
+
+  body > main[class] {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 48px), 80rem);
+    max-width: 80rem;
+    min-width: 0;
+    margin-right: 0;
+    margin-left: calc(
+      var(--desktop-sidebar-width) +
+      max(24px, (100vw - var(--desktop-sidebar-width) - 80rem) / 2)
+    );
+  }
+}
+
+@media (min-width: 1440px) {
+  .topbar { padding-inline: 40px; }
+
+  body > main[class] {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 80px), 80rem);
+    margin-left: calc(
+      var(--desktop-sidebar-width) +
+      max(40px, (100vw - var(--desktop-sidebar-width) - 80rem) / 2)
+    );
+  }
+}

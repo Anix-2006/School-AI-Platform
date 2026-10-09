@@ -30,6 +30,19 @@ are cleared when the browser session ends.
 Use `textContent`, `createElement`, or escaped templates for API-provided data.
 Do not insert untrusted values directly with `innerHTML`.
 
+## Responsive shell
+
+- Below `640px`: compact mobile content and stacked controls.
+- From `640px`: tablet content gains wider padding and multi-column layouts
+  where each flow supports them.
+- From `1024px`: the fixed `17rem` sidebar and desktop content topbar are
+  persistent. The hamburger, close button, and backdrop are hidden.
+- From `1440px`: shell gutters widen while content stays centred at a maximum
+  width of `80rem`.
+
+The sidebar remains keyboard reachable on desktop. Mobile drawer focus
+management and all layouts below `1024px` remain unchanged.
+
 ## Security and data limits
 
 The token endpoint and workbook are demo-only. `sessionStorage` reduces token
