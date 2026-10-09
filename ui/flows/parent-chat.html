@@ -4,121 +4,333 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parent chat — School Parent AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-<header class="topbar">
-  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
-  <a class="topbar-brand" href="/">School Parent AI</a>
+<body class="parent-body">
+<header class="topbar parent-topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <a class="topbar-brand" href="/" data-i18n="appName">School Parent AI</a>
+  <span class="topbar-spacer"></span>
+  <label class="sr-only" for="interfaceLanguage" data-i18n="language">Interface language</label>
+  <select class="language-select" id="interfaceLanguage">
+    <option value="en">English</option>
+    <option value="hi">हिन्दी</option>
+    <option value="te">తెలుగు</option>
+  </select>
 </header>
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 <aside class="sidebar" id="sidebar" aria-label="App pages">
   <div class="sidebar-header">
     <h2>Pages</h2>
-    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
   </div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
 
-  <h1>Parent chat</h1>
-  <p class="lead">Parent app: send a message about your child and get a tool-grounded reply.</p>
-  <div class="chat-shell">
-    <div class="panel">
-      <h3>Context</h3>
-      <label for="guardianId">Parent</label>
-      <select id="guardianId"><option value="">Loading…</option></select>
-      <p class="meta" id="guardianMeta" style="margin-top:8px"></p>
-      <p class="meta" id="authMeta" style="margin-top:12px">Connecting…</p>
+<main class="parent-page" id="main">
+  <section class="child-header" aria-labelledby="childName">
+    <div class="child-avatar" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0"/></svg>
     </div>
-    <div class="chat-thread">
-      <div class="chat-messages" id="messages">
-        <div class="bubble bot">Hi — ask about attendance, homework, marks, or anything school-related.</div>
-      </div>
-      <div class="chat-compose">
-        <textarea id="message" placeholder="Was my child present on 6 October?">Was my child present on 6 October?</textarea>
-        <div class="actions">
-          <button type="button" id="sendBtn">Send message</button>
+    <div class="child-title">
+      <p class="eyebrow" data-i18n="parentChat">Parent chat</p>
+      <h1 id="childName" aria-live="polite">—</h1>
+      <p id="childClass" class="child-class"></p>
+    </div>
+    <label class="sr-only" for="guardianId" data-i18n="child">Child</label>
+    <select id="guardianId" class="child-switcher">
+      <option value="" data-i18n="loadingChildren">Loading children…</option>
+    </select>
+  </section>
+
+  <div id="pageState" class="state state-loading" role="status" data-i18n="loadingChildren">Loading children…</div>
+
+  <div class="parent-layout" id="parentExperience" hidden>
+    <section class="parent-chat-card" aria-labelledby="chatTitle">
+      <div class="chat-intro">
+        <div>
+          <h2 id="chatTitle" data-i18n="parentChat">Parent chat</h2>
+          <p data-i18n="parentChatLead">Ask about your child’s school day.</p>
         </div>
-        <div id="chatError" class="error" hidden></div>
+        <button type="button" class="icon-button" id="newConversation" aria-label="New conversation" title="New conversation">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
       </div>
-    </div>
-  </div>
 
+      <div class="quick-actions" id="quickActions" aria-label="Quick actions"></div>
+
+      <div class="chat-messages parent-messages" id="messages" aria-live="polite" aria-relevant="additions"></div>
+      <div class="typing-indicator" id="typingIndicator" role="status" hidden>
+        <span></span><span></span><span></span>
+        <span class="sr-only" data-i18n="typing">School helper is typing</span>
+      </div>
+
+      <div class="parent-compose">
+        <label class="sr-only" for="message" data-i18n="message">Message</label>
+        <textarea id="message" rows="1" data-i18n-placeholder="messagePlaceholder" placeholder="Ask about your child…"></textarea>
+        <button type="button" class="send-button" id="sendBtn" disabled>
+          <span data-i18n="send">Send</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 17 8-17 8 3-8-3-8Zm3 8h14"/></svg>
+        </button>
+      </div>
+      <div id="chatError" class="error retry-row" role="alert" hidden>
+        <span id="chatErrorText"></span>
+        <button type="button" class="secondary" id="retrySend" data-i18n="retry">Try again</button>
+      </div>
+      <button type="button" class="secondary print-response" id="printResponse" data-i18n="printResponse" hidden>Print response</button>
+    </section>
+
+    <aside class="updates-card" aria-labelledby="updatesTitle">
+      <div class="updates-heading">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v14H5zM8 9h8M8 13h5"/></svg>
+        <h2 id="updatesTitle" data-i18n="updates">Updates</h2>
+      </div>
+      <p data-i18n="updatesHelp">Choose an action to ask for current information.</p>
+      <div id="updateActions" class="update-actions"></div>
+      <p class="availability-note" data-i18n="structuredUnavailable">Structured update cards are not available from this API. Answers below come from the school assistant.</p>
+      <div class="service-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="authMeta" data-i18n="schoolConnected">School service connected</span>
+      </div>
+      <p id="consentMeta" class="meta"></p>
+    </aside>
+  </div>
 </main>
+
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
 (() => {
-  const messages = document.getElementById('messages');
-  const err = document.getElementById('chatError');
-  const authMeta = document.getElementById('authMeta');
+  "use strict";
 
-  function addBubble(text, who, agent) {
-    const el = document.createElement('div');
-    el.className = 'bubble ' + who;
-    el.textContent = text;
+  const guardianSelect = document.getElementById("guardianId");
+  const languageSelect = document.getElementById("interfaceLanguage");
+  const pageState = document.getElementById("pageState");
+  const experience = document.getElementById("parentExperience");
+  const messages = document.getElementById("messages");
+  const input = document.getElementById("message");
+  const sendButton = document.getElementById("sendBtn");
+  const typing = document.getElementById("typingIndicator");
+  const errorBox = document.getElementById("chatError");
+  const errorText = document.getElementById("chatErrorText");
+  const printButton = document.getElementById("printResponse");
+  let contexts = [];
+  let waiting = false;
+  let sessionId = makeSessionId();
+  let lastMessage = "";
+  let rankRequested = false;
+
+  function makeSessionId() {
+    return `parent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  function currentContext() {
+    return contexts.find((item) => String(item.id) === guardianSelect.value);
+  }
+
+  function currentLanguage() {
+    return languageSelect.value;
+  }
+
+  function addBubble(text, who, agent, options = {}) {
+    const article = document.createElement("article");
+    article.className = `bubble ${who}`;
+    if (options.rankCard) article.classList.add("rank-card-response");
+
+    const body = document.createElement("p");
+    body.textContent = text;
+    article.appendChild(body);
+
+    const footer = document.createElement("footer");
+    const time = document.createElement("time");
+    time.dateTime = new Date().toISOString();
+    time.textContent = new Intl.DateTimeFormat(currentLanguage(), {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date());
+    footer.appendChild(time);
     if (agent) {
-      const tag = document.createElement('span');
-      tag.className = 'agent-tag';
-      tag.textContent = 'helper: ' + agent;
-      el.appendChild(tag);
+      const tag = document.createElement("span");
+      tag.className = "agent-tag";
+      tag.textContent = `${SchoolAPI.t("agent", currentLanguage())}: ${agent}`;
+      footer.appendChild(tag);
     }
-    messages.appendChild(el);
+    article.appendChild(footer);
+    messages.appendChild(article);
     messages.scrollTop = messages.scrollHeight;
+    return article;
   }
 
-  const guardianSelect = document.getElementById('guardianId');
-  const guardianMeta = document.getElementById('guardianMeta');
-  let guardians = [];
-  let sessionId = String(Date.now());
-
-  function showGuardian() {
-    const g = guardians.find((x) => x.id === guardianSelect.value);
-    if (!g) { guardianMeta.textContent = ''; return; }
-    guardianMeta.textContent = `Child: ${g.student_name} (${g.student_id}) · Language: ${g.preferred_language}` +
-      (g.has_consent ? '' : ' · No consent - the assistant will refuse to reply');
+  function resetConversation() {
+    sessionId = makeSessionId();
+    rankRequested = false;
+    printButton.hidden = true;
+    messages.replaceChildren();
+    addBubble(SchoolAPI.t("welcome", currentLanguage()), "bot");
+    errorBox.hidden = true;
   }
 
-  guardianSelect.addEventListener('change', () => {
-    sessionId = String(Date.now());
-    messages.innerHTML = '<div class="bubble bot">New conversation - ask about attendance, homework, marks, or anything school-related.</div>';
-    showGuardian();
-  });
+  function actionDefinitions(context) {
+    const actions = [
+      { key: "attendance", prompt: "Please share my child’s latest attendance information." },
+      { key: "homework", prompt: "What homework does my child have?" },
+      { key: "syllabus", prompt: "What syllabus should my child currently be learning?" },
+    ];
+    if (context.age_tier === "primary") {
+      actions.push({ key: "rank", prompt: "Please provide my child’s rank card from available school records." });
+    }
+    return actions;
+  }
 
-  SchoolAPI.ensureAuth().then(async (s) => {
-    authMeta.textContent = 'School: ' + s.tenantId;
-    guardians = await SchoolAPI.fillGuardianSelect(guardianSelect);
-    showGuardian();
-  }).catch((e) => { authMeta.textContent = e.message; });
+  function renderActions(context) {
+    const quick = document.getElementById("quickActions");
+    const updates = document.getElementById("updateActions");
+    quick.replaceChildren();
+    updates.replaceChildren();
+    actionDefinitions(context).forEach((action) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "quick-action";
+      button.dataset.prompt = action.prompt;
+      button.dataset.action = action.key;
+      button.textContent = SchoolAPI.t(action.key, currentLanguage());
+      button.addEventListener("click", chooseAction);
+      quick.appendChild(button);
 
-  document.getElementById('sendBtn').addEventListener('click', async () => {
-    err.hidden = true;
-    const message = document.getElementById('message').value.trim();
-    if (!message || !guardianSelect.value) return;
-    addBubble(message, 'user');
-    document.getElementById('sendBtn').disabled = true;
+      const updateButton = button.cloneNode(true);
+      updateButton.className = "update-action";
+      updateButton.addEventListener("click", chooseAction);
+      updates.appendChild(updateButton);
+    });
+  }
+
+  function chooseAction(event) {
+    rankRequested = event.currentTarget.dataset.action === "rank";
+    input.value = event.currentTarget.dataset.prompt;
+    updateSendState();
+    input.focus();
+  }
+
+  function renderContext() {
+    const context = currentContext();
+    if (!context) return;
+    document.getElementById("childName").textContent = context.student_name;
+    document.getElementById("childClass").textContent =
+      [context.grade, context.section].filter(Boolean).join(" · ");
+    document.getElementById("consentMeta").textContent =
+      context.has_consent ? "" : SchoolAPI.t("noConsent", currentLanguage());
+    renderActions(context);
+    resetConversation();
+    updateSendState();
+  }
+
+  function updateSendState() {
+    sendButton.disabled = waiting || !input.value.trim() || !guardianSelect.value;
+    sendButton.querySelector("span").textContent =
+      SchoolAPI.t(waiting ? "sending" : "send", currentLanguage());
+  }
+
+  async function sendMessage() {
+    const message = input.value.trim();
+    const context = currentContext();
+    if (!message || !context || waiting) return;
+    lastMessage = message;
+    addBubble(message, "user");
+    input.value = "";
+    waiting = true;
+    typing.hidden = false;
+    errorBox.hidden = true;
+    updateSendState();
+    messages.scrollTop = messages.scrollHeight;
     try {
       const data = await SchoolAPI.chat({
-        guardian_id: guardianSelect.value,
+        guardian_id: String(context.id),
+        student_id: String(context.student_id),
         message,
         session_id: sessionId,
       });
-      addBubble(data.reply || '(empty reply)', 'bot', data.agent_used);
-    } catch (e) {
-      err.hidden = false;
-      err.textContent = e.message;
+      const response = addBubble(data.reply || "", "bot", data.agent_used, {
+        rankCard: context.age_tier === "primary" && rankRequested,
+      });
+      if (context.age_tier === "primary" && data.reply) {
+        response.classList.add("printable-response");
+        printButton.hidden = false;
+      }
+      rankRequested = false;
+    } catch (error) {
+      errorText.textContent = error.message;
+      errorBox.hidden = false;
     } finally {
-      document.getElementById('sendBtn').disabled = false;
+      waiting = false;
+      typing.hidden = true;
+      updateSendState();
+      input.focus();
+    }
+  }
+
+  function applyLanguage() {
+    SchoolAPI.localize(document, currentLanguage());
+    const context = currentContext();
+    if (context) {
+      renderActions(context);
+      document.getElementById("consentMeta").textContent =
+        context.has_consent ? "" : SchoolAPI.t("noConsent", currentLanguage());
+    }
+    updateSendState();
+  }
+
+  input.addEventListener("input", updateSendState);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
     }
   });
+  sendButton.addEventListener("click", sendMessage);
+  document.getElementById("retrySend").addEventListener("click", () => {
+    input.value = lastMessage;
+    updateSendState();
+    sendMessage();
+  });
+  document.getElementById("newConversation").addEventListener("click", resetConversation);
+  printButton.addEventListener("click", () => window.print());
+  guardianSelect.addEventListener("change", renderContext);
+  languageSelect.addEventListener("change", applyLanguage);
+
+  Promise.all([SchoolAPI.ensureAuth(), SchoolAPI.listParentContexts()])
+    .then(([auth, items]) => {
+      contexts = items;
+      guardianSelect.replaceChildren();
+      if (!contexts.length) {
+        pageState.className = "state";
+        pageState.textContent = SchoolAPI.t("noGuardians", currentLanguage());
+        return;
+      }
+      contexts.forEach((context) => {
+        const option = document.createElement("option");
+        option.value = String(context.id);
+        option.textContent = `${context.student_name} — ${context.name}`;
+        guardianSelect.appendChild(option);
+      });
+      const preferred = SchoolAPI.normalizeLanguage(contexts[0].preferred_language);
+      languageSelect.value = preferred;
+      document.getElementById("authMeta").textContent =
+        auth.schoolName || SchoolAPI.t("schoolConnected", preferred);
+      pageState.hidden = true;
+      experience.hidden = false;
+      applyLanguage();
+      renderContext();
+    })
+    .catch((error) => {
+      pageState.className = "state state-error";
+      pageState.textContent = error.message;
+    });
 })();
 </script>
-
 </body>
 </html>

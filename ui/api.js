@@ -170,6 +170,207 @@
     return `${guardian.name} (${guardian.relation || "guardian"} of ${guardian.student_name}, ${className})${consent}`;
   }
 
+  const translations = Object.freeze({
+    en: Object.freeze({
+      appName: "School Parent AI",
+      parentChat: "Parent chat",
+      parentChatLead: "Ask about your child’s school day.",
+      child: "Child",
+      language: "Interface language",
+      attendance: "Attendance",
+      homework: "Homework",
+      syllabus: "Syllabus",
+      rank: "Rank card",
+      updates: "Updates",
+      updatesHelp: "Choose an action to ask for current information.",
+      structuredUnavailable: "Structured update cards are not available from this API. Answers below come from the school assistant.",
+      message: "Message",
+      messagePlaceholder: "Ask about your child…",
+      send: "Send",
+      sending: "Sending",
+      retry: "Try again",
+      newConversation: "New conversation",
+      welcome: "How can we help with your child’s school day?",
+      noGuardians: "No linked children are available.",
+      loadingChildren: "Loading children…",
+      schoolConnected: "School service connected",
+      noConsent: "Consent is required before the assistant can reply.",
+      helper: "Helper",
+      askHelper: "Ask a helper",
+      helperLead: "Choose a topic. The orchestrator will send it to the right school helper.",
+      dailyUpdate: "Daily update",
+      dailyHelp: "Attendance, homework, and daily care.",
+      academic: "Learning",
+      academicHelp: "Syllabus, learning progress, and milestones.",
+      parentTeacher: "Parent–teacher",
+      parentTeacherHelp: "Messages, meetings, or concerns for a teacher.",
+      communication: "School information",
+      communicationHelp: "Timings, holidays, events, fees, and notices.",
+      routedTo: "Routed to",
+      decidedByClassifier: "intent classifier",
+      decidedByRouter: "AI router",
+      confidence: "confidence",
+      whatsapp: "WhatsApp",
+      whatsappLead: "Preview how a parent message is handled through the school’s WhatsApp channel.",
+      sendAs: "Send as",
+      customSender: "Someone else (unregistered number)",
+      phoneNumber: "Phone number",
+      registered: "Registered guardian",
+      simulation: "Simulation only",
+      channelConnected: "WhatsApp business number configured",
+      channelNotConfigured: "WhatsApp business number is not configured; webhook delivery is simulated.",
+      noReply: "No reply",
+      webhookNote: "Registered guardians with consent can receive a reply. Custom numbers demonstrate the safe no-reply path.",
+      printResponse: "Print response",
+      agent: "Helper",
+      typing: "School helper is typing",
+      emptyMessage: "Write a message before sending.",
+    }),
+    hi: Object.freeze({
+      appName: "स्कूल पैरेंट AI",
+      parentChat: "अभिभावक चैट",
+      parentChatLead: "अपने बच्चे के स्कूल दिवस के बारे में पूछें।",
+      child: "बच्चा",
+      language: "इंटरफ़ेस भाषा",
+      attendance: "उपस्थिति",
+      homework: "गृहकार्य",
+      syllabus: "पाठ्यक्रम",
+      rank: "रैंक कार्ड",
+      updates: "अपडेट",
+      updatesHelp: "नई जानकारी पूछने के लिए कोई विकल्प चुनें।",
+      structuredUnavailable: "इस API में संरचित अपडेट कार्ड उपलब्ध नहीं हैं। नीचे के उत्तर स्कूल सहायक से आते हैं।",
+      message: "संदेश",
+      messagePlaceholder: "अपने बच्चे के बारे में पूछें…",
+      send: "भेजें",
+      sending: "भेजा जा रहा है",
+      retry: "फिर कोशिश करें",
+      newConversation: "नई बातचीत",
+      welcome: "हम आपके बच्चे के स्कूल दिवस में कैसे मदद करें?",
+      noGuardians: "कोई जुड़ा हुआ बच्चा उपलब्ध नहीं है।",
+      loadingChildren: "बच्चे लोड हो रहे हैं…",
+      schoolConnected: "स्कूल सेवा जुड़ी है",
+      noConsent: "सहायक के उत्तर से पहले सहमति आवश्यक है।",
+      helper: "सहायक",
+      askHelper: "सहायक से पूछें",
+      helperLead: "विषय चुनें। सही स्कूल सहायक उत्तर देगा।",
+      dailyUpdate: "दैनिक अपडेट",
+      dailyHelp: "उपस्थिति, गृहकार्य और दैनिक देखभाल।",
+      academic: "पढ़ाई",
+      academicHelp: "पाठ्यक्रम, सीखने की प्रगति और उपलब्धियाँ।",
+      parentTeacher: "अभिभावक–शिक्षक",
+      parentTeacherHelp: "शिक्षक के लिए संदेश, बैठक या चिंता।",
+      communication: "स्कूल जानकारी",
+      communicationHelp: "समय, छुट्टियाँ, कार्यक्रम, शुल्क और सूचनाएँ।",
+      routedTo: "भेजा गया",
+      decidedByClassifier: "इंटेंट क्लासिफ़ायर",
+      decidedByRouter: "AI राउटर",
+      confidence: "विश्वास",
+      whatsapp: "व्हाट्सऐप",
+      whatsappLead: "देखें कि स्कूल का व्हाट्सऐप चैनल संदेश कैसे संभालता है।",
+      sendAs: "इस रूप में भेजें",
+      customSender: "कोई अन्य (अपंजीकृत नंबर)",
+      phoneNumber: "फ़ोन नंबर",
+      registered: "पंजीकृत अभिभावक",
+      simulation: "केवल सिमुलेशन",
+      channelConnected: "व्हाट्सऐप बिज़नेस नंबर कॉन्फ़िगर है",
+      channelNotConfigured: "व्हाट्सऐप बिज़नेस नंबर कॉन्फ़िगर नहीं है; वेबहुक डिलीवरी सिमुलेट होगी।",
+      noReply: "कोई उत्तर नहीं",
+      webhookNote: "सहमति वाले पंजीकृत अभिभावक उत्तर पा सकते हैं। कस्टम नंबर सुरक्षित नो-रिप्लाई पथ दिखाते हैं।",
+      printResponse: "उत्तर प्रिंट करें",
+      agent: "सहायक",
+      typing: "स्कूल सहायक लिख रहा है",
+      emptyMessage: "भेजने से पहले संदेश लिखें।",
+    }),
+    te: Object.freeze({
+      appName: "స్కూల్ పేరెంట్ AI",
+      parentChat: "తల్లిదండ్రుల చాట్",
+      parentChatLead: "మీ పిల్లల పాఠశాల రోజు గురించి అడగండి.",
+      child: "పిల్లలు",
+      language: "ఇంటర్‌ఫేస్ భాష",
+      attendance: "హాజరు",
+      homework: "హోంవర్క్",
+      syllabus: "సిలబస్",
+      rank: "ర్యాంక్ కార్డ్",
+      updates: "అప్‌డేట్‌లు",
+      updatesHelp: "ప్రస్తుత సమాచారం అడగడానికి ఒక చర్యను ఎంచుకోండి.",
+      structuredUnavailable: "ఈ APIలో నిర్మిత అప్‌డేట్ కార్డ్‌లు అందుబాటులో లేవు. దిగువ సమాధానాలు పాఠశాల సహాయకుడి నుండి వస్తాయి.",
+      message: "సందేశం",
+      messagePlaceholder: "మీ పిల్లల గురించి అడగండి…",
+      send: "పంపండి",
+      sending: "పంపుతోంది",
+      retry: "మళ్లీ ప్రయత్నించండి",
+      newConversation: "కొత్త సంభాషణ",
+      welcome: "మీ పిల్లల పాఠశాల రోజుకు మేము ఎలా సహాయపడగలం?",
+      noGuardians: "లింక్ చేసిన పిల్లలు అందుబాటులో లేరు.",
+      loadingChildren: "పిల్లలను లోడ్ చేస్తోంది…",
+      schoolConnected: "పాఠశాల సేవ కనెక్ట్ అయింది",
+      noConsent: "సహాయకుడు సమాధానం ఇవ్వడానికి ముందు సమ్మతి అవసరం.",
+      helper: "సహాయకుడు",
+      askHelper: "సహాయకుడిని అడగండి",
+      helperLead: "ఒక అంశాన్ని ఎంచుకోండి. సరైన పాఠశాల సహాయకుడు సమాధానం ఇస్తారు.",
+      dailyUpdate: "రోజువారీ అప్‌డేట్",
+      dailyHelp: "హాజరు, హోంవర్క్ మరియు రోజువారీ సంరక్షణ.",
+      academic: "అభ్యాసం",
+      academicHelp: "సిలబస్, అభ్యాస పురోగతి మరియు మైలురాళ్లు.",
+      parentTeacher: "తల్లిదండ్రులు–ఉపాధ్యాయులు",
+      parentTeacherHelp: "ఉపాధ్యాయునికి సందేశాలు, సమావేశాలు లేదా ఆందోళనలు.",
+      communication: "పాఠశాల సమాచారం",
+      communicationHelp: "సమయాలు, సెలవులు, కార్యక్రమాలు, ఫీజులు మరియు ప్రకటనలు.",
+      routedTo: "పంపబడింది",
+      decidedByClassifier: "ఇంటెంట్ క్లాసిఫయర్",
+      decidedByRouter: "AI రౌటర్",
+      confidence: "నమ్మకం",
+      whatsapp: "వాట్సాప్",
+      whatsappLead: "పాఠశాల వాట్సాప్ ఛానెల్ సందేశాన్ని ఎలా నిర్వహిస్తుందో చూడండి.",
+      sendAs: "ఇలా పంపండి",
+      customSender: "మరొకరు (నమోదు కాని నంబర్)",
+      phoneNumber: "ఫోన్ నంబర్",
+      registered: "నమోదిత సంరక్షకుడు",
+      simulation: "సిమ్యులేషన్ మాత్రమే",
+      channelConnected: "వాట్సాప్ బిజినెస్ నంబర్ కాన్ఫిగర్ అయింది",
+      channelNotConfigured: "వాట్సాప్ బిజినెస్ నంబర్ కాన్ఫిగర్ కాలేదు; వెబ్‌హుక్ డెలివరీ సిమ్యులేట్ అవుతుంది.",
+      noReply: "సమాధానం లేదు",
+      webhookNote: "సమ్మతి ఉన్న నమోదిత సంరక్షకులు సమాధానం పొందగలరు. కస్టమ్ నంబర్లు సురక్షిత నో-రిప్లై మార్గాన్ని చూపుతాయి.",
+      printResponse: "సమాధానం ప్రింట్ చేయండి",
+      agent: "సహాయకుడు",
+      typing: "పాఠశాల సహాయకుడు టైప్ చేస్తున్నారు",
+      emptyMessage: "పంపే ముందు సందేశం రాయండి.",
+    }),
+  });
+
+  function normalizeLanguage(language) {
+    const shortCode = String(language || "en").toLowerCase().split(/[-_]/)[0];
+    return Object.hasOwn(translations, shortCode) ? shortCode : "en";
+  }
+
+  function t(key, language = "en") {
+    const code = normalizeLanguage(language);
+    return translations[code][key] || translations.en[key] || key;
+  }
+
+  function localize(root = document, language = "en") {
+    const code = normalizeLanguage(language);
+    root.querySelectorAll("[data-i18n]").forEach((element) => {
+      element.textContent = t(element.dataset.i18n, code);
+    });
+    root.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+      element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder, code));
+    });
+    document.documentElement.lang = code;
+  }
+
+  async function listParentContexts() {
+    const [guardians, students] = await Promise.all([
+      window.SchoolAPI.listGuardians(),
+      window.SchoolAPI.listStudents(),
+    ]);
+    const studentsById = new Map(students.map((student) => [String(student.id), student]));
+    return guardians.map((guardian) => ({
+      ...guardian,
+      age_tier: studentsById.get(String(guardian.student_id))?.age_tier || "primary_lower",
+    }));
+  }
+
   async function fillGuardianSelect(select) {
     const guardians = await window.SchoolAPI.listGuardians();
     select.replaceChildren();
@@ -189,6 +390,11 @@
     clearAuth,
     guardianLabel,
     fillGuardianSelect,
+    translations,
+    normalizeLanguage,
+    t,
+    localize,
+    listParentContexts,
     async health() {
       return request("/health", { retry: true });
     },

@@ -4,111 +4,206 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WhatsApp — School Parent AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-<header class="topbar">
-  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
-  <a class="topbar-brand" href="/">School Parent AI</a>
+<body class="parent-body">
+<header class="topbar parent-topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <a class="topbar-brand" href="/" data-i18n="appName">School Parent AI</a>
+  <span class="topbar-spacer"></span>
+  <label class="sr-only" for="interfaceLanguage" data-i18n="language">Interface language</label>
+  <select class="language-select" id="interfaceLanguage"><option value="en">English</option><option value="hi">हिन्दी</option><option value="te">తెలుగు</option></select>
 </header>
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 <aside class="sidebar" id="sidebar" aria-label="App pages">
-  <div class="sidebar-header">
-    <h2>Pages</h2>
-    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
-  </div>
+  <div class="sidebar-header"><h2>Pages</h2><button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
 
-  <h1>WhatsApp</h1>
-  <p class="lead">WhatsApp channel: parents text the school number; the same orchestrator replies.</p>
-  <div class="panel" style="max-width:420px;margin:0 auto 16px">
-    <label for="waFrom">Send as</label>
-    <select id="waFrom"><option value="">Loading…</option></select>
-    <div id="waCustomWrap" hidden>
-      <label for="waCustom">Phone number</label>
-      <input id="waCustom" placeholder="e.g. 919876543210" autocomplete="off">
-    </div>
+<main class="page whatsapp-page">
+  <div class="parent-page-heading">
+    <div><p class="eyebrow">Parent channel</p><h1 data-i18n="whatsapp">WhatsApp</h1><p class="lead" data-i18n="whatsappLead">Preview how a parent message is handled through the school’s WhatsApp channel.</p></div>
+    <div class="channel-status" id="channelStatus" role="status"><span class="status-dot" aria-hidden="true"></span><span>Connecting…</span></div>
   </div>
-  <div class="phone">
-    <div class="phone-notch"></div>
-    <div class="phone-screen">
-      <div class="phone-header">School Parent AI</div>
-      <div class="phone-messages" id="waMessages">
-        <div class="bubble bot">Send a WhatsApp-style message about your child.</div>
-      </div>
-      <div class="phone-compose">
-        <input id="waInput" value="Was my child present on 6 October?" />
-        <button type="button" id="waSend">Send</button>
-      </div>
-    </div>
-  </div>
-  <p class="meta" style="text-align:center;margin-top:14px">Posts a Meta-style message to the WhatsApp webhook. Only registered guardians who have given consent get a reply. Outbound WhatsApp stays stubbed until credentials are set.</p>
-  <div id="waError" class="error" hidden style="text-align:center"></div>
 
+  <div class="whatsapp-layout">
+    <section class="panel sender-panel">
+      <label for="waFrom" data-i18n="sendAs">Send as</label>
+      <select id="waFrom"><option value="">Loading…</option></select>
+      <div id="waCustomWrap" hidden>
+        <label for="waCustom" data-i18n="phoneNumber">Phone number</label>
+        <input id="waCustom" inputmode="tel" placeholder="919876543210" autocomplete="off">
+      </div>
+      <p class="availability-note" data-i18n="webhookNote">Registered guardians with consent can receive a reply. Custom numbers demonstrate the safe no-reply path.</p>
+      <p class="meta" id="senderContext"></p>
+    </section>
+
+    <section class="phone" aria-label="WhatsApp message preview">
+      <div class="phone-screen">
+        <header class="phone-header">
+          <span class="wa-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0-7.7-4.3L3 21l4.5-1.2A9 9 0 0 0 12 21Z"/><path d="M8.5 8.5c.5 3 2 4.5 5 5l1-1.2 2 .8c-.2 1.8-1.2 2.7-2.8 2.5-3.7-.5-6.8-3.6-7.3-7.3-.2-1.6.7-2.6 2.5-2.8l.8 2-1.2 1Z"/></svg></span>
+          <span><strong data-i18n="appName">School Parent AI</strong><small id="waHeaderStatus" data-i18n="simulation">Simulation only</small></span>
+        </header>
+        <div class="phone-messages" id="waMessages" aria-live="polite"></div>
+        <div class="typing-indicator wa-typing" id="waTyping" role="status" hidden><span></span><span></span><span></span><span class="sr-only" data-i18n="typing">School helper is typing</span></div>
+        <div class="phone-compose">
+          <label class="sr-only" for="waInput" data-i18n="message">Message</label>
+          <textarea id="waInput" rows="1" data-i18n-placeholder="messagePlaceholder" placeholder="Ask about your child…"></textarea>
+          <button type="button" id="waSend" aria-label="Send" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 17 8-17 8 3-8-3-8Zm3 8h14"/></svg></button>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div id="waError" class="error retry-row" role="alert" hidden><span id="waErrorText"></span><button type="button" class="secondary" id="waRetry" data-i18n="retry">Try again</button></div>
 </main>
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
 (() => {
-  const thread = document.getElementById('waMessages');
-  const err = document.getElementById('waError');
+  "use strict";
+  const thread = document.getElementById("waMessages");
+  const fromSelect = document.getElementById("waFrom");
+  const customInput = document.getElementById("waCustom");
+  const input = document.getElementById("waInput");
+  const send = document.getElementById("waSend");
+  const language = document.getElementById("interfaceLanguage");
+  const typing = document.getElementById("waTyping");
+  const errorBox = document.getElementById("waError");
+  let guardians = [];
+  let waiting = false;
+  let lastText = "";
+  let channelConfigured = false;
+
   function bubble(text, who, agent) {
-    const el = document.createElement('div');
-    el.className = 'bubble ' + who;
-    el.textContent = text;
+    const item = document.createElement("article");
+    item.className = `bubble ${who}`;
+    const body = document.createElement("p");
+    body.textContent = text;
+    const footer = document.createElement("footer");
+    const time = document.createElement("time");
+    time.dateTime = new Date().toISOString();
+    time.textContent = new Intl.DateTimeFormat(language.value, { hour: "numeric", minute: "2-digit" }).format(new Date());
+    footer.appendChild(time);
     if (agent) {
-      const tag = document.createElement('span');
-      tag.className = 'agent-tag';
-      tag.textContent = agent;
-      el.appendChild(tag);
+      const tag = document.createElement("span");
+      tag.className = "agent-tag";
+      tag.textContent = `${SchoolAPI.t("agent", language.value)}: ${agent}`;
+      footer.appendChild(tag);
     }
-    thread.appendChild(el);
+    item.append(body, footer);
+    thread.appendChild(item);
     thread.scrollTop = thread.scrollHeight;
   }
-  const fromSelect = document.getElementById('waFrom');
-  const customWrap = document.getElementById('waCustomWrap');
-  SchoolAPI.listGuardians().then((guardians) => {
-    fromSelect.innerHTML = guardians
-      .filter((g) => g.whatsapp_number)
-      .map((g) => `<option value="${g.whatsapp_number}">${SchoolAPI.guardianLabel(g)}</option>`)
-      .join('') + '<option value="custom">Someone else (unregistered number)</option>';
-  }).catch((e) => { err.hidden = false; err.textContent = e.message; });
-  fromSelect.addEventListener('change', () => {
-    customWrap.hidden = fromSelect.value !== 'custom';
-    thread.innerHTML = '<div class="bubble bot">Send a WhatsApp-style message about your child.</div>';
-  });
 
-  document.getElementById('waSend').addEventListener('click', async () => {
-    err.hidden = true;
-    const text = document.getElementById('waInput').value.trim();
-    const from = fromSelect.value === 'custom'
-      ? document.getElementById('waCustom').value.trim()
-      : fromSelect.value;
-    if (!text || !from) return;
-    bubble(text, 'user');
+  function resetThread() {
+    thread.replaceChildren();
+    bubble(SchoolAPI.t("welcome", language.value), "bot");
+    errorBox.hidden = true;
+  }
+
+  function selectedNumber() {
+    return fromSelect.value === "custom" ? customInput.value.trim() : fromSelect.value;
+  }
+
+  function updateSend() {
+    send.disabled = waiting || !input.value.trim() || !selectedNumber();
+  }
+
+  function showSender() {
+    const custom = fromSelect.value === "custom";
+    document.getElementById("waCustomWrap").hidden = !custom;
+    const guardian = guardians.find((item) => item.whatsapp_number === fromSelect.value);
+    document.getElementById("senderContext").textContent = guardian
+      ? `${guardian.student_name} · ${guardian.grade}${guardian.section ? `-${guardian.section}` : ""}`
+      : SchoolAPI.t("customSender", language.value);
+    resetThread();
+    updateSend();
+  }
+
+  function applyLanguage() {
+    SchoolAPI.localize(document, language.value);
+    const customOption = fromSelect.querySelector('option[value="custom"]');
+    if (customOption) customOption.textContent = SchoolAPI.t("customSender", language.value);
+    const status = document.getElementById("channelStatus");
+    status.classList.toggle("not-configured", !channelConfigured);
+    status.querySelector("span:last-child").textContent = SchoolAPI.t(
+      channelConfigured ? "channelConnected" : "channelNotConfigured",
+      language.value
+    );
+    document.getElementById("waHeaderStatus").textContent = SchoolAPI.t(
+      channelConfigured ? "registered" : "simulation",
+      language.value
+    );
+    showSender();
+  }
+
+  async function submit() {
+    const text = input.value.trim();
+    const from = selectedNumber();
+    if (!text || !from || waiting) return;
+    lastText = text;
+    bubble(text, "user");
+    input.value = "";
+    waiting = true;
+    typing.hidden = false;
+    errorBox.hidden = true;
+    updateSend();
     try {
       const data = await SchoolAPI.sendWhatsAppWebhook(from, text);
-      if (data.status === 'ok') {
-        bubble(data.reply || '(reply sent over WhatsApp)', 'bot', data.agent_used);
+      if (data.status === "ok") {
+        bubble(data.reply || "Message accepted by the WhatsApp channel.", "bot", data.agent_used);
       } else {
-        const note = document.createElement('p');
-        note.className = 'meta';
-        note.textContent = `No reply - ${data.reason}.`;
-        thread.appendChild(note);
+        bubble(`${SchoolAPI.t("noReply", language.value)} — ${data.reason || "request ignored"}.`, "bot");
       }
-    } catch (e) {
-      err.hidden = false; err.textContent = e.message;
+    } catch (error) {
+      document.getElementById("waErrorText").textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      waiting = false;
+      typing.hidden = true;
+      updateSend();
     }
+  }
+
+  fromSelect.addEventListener("change", showSender);
+  customInput.addEventListener("input", updateSend);
+  language.addEventListener("change", applyLanguage);
+  input.addEventListener("input", updateSend);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submit();
+    }
+  });
+  send.addEventListener("click", submit);
+  document.getElementById("waRetry").addEventListener("click", () => {
+    input.value = lastText;
+    updateSend();
+    submit();
+  });
+
+  Promise.all([SchoolAPI.ensureAuth(), SchoolAPI.listGuardians()]).then(([auth, items]) => {
+    guardians = items.filter((item) => item.whatsapp_number);
+    fromSelect.replaceChildren();
+    guardians.forEach((guardian) => {
+      const option = document.createElement("option");
+      option.value = guardian.whatsapp_number;
+      option.textContent = SchoolAPI.guardianLabel(guardian);
+      fromSelect.appendChild(option);
+    });
+    const custom = document.createElement("option");
+    custom.value = "custom";
+    custom.textContent = SchoolAPI.t("customSender", language.value);
+    fromSelect.appendChild(custom);
+    channelConfigured = Boolean(auth.whatsappPhoneNumberId);
+    if (guardians[0]) language.value = SchoolAPI.normalizeLanguage(guardians[0].preferred_language);
+    applyLanguage();
+  }).catch((error) => {
+    document.getElementById("waErrorText").textContent = error.message;
+    errorBox.hidden = false;
   });
 })();
 </script>
-
 </body>
 </html>
