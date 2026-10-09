@@ -3194,6 +3194,117 @@ button.secondary:hover {
     width: 22.5rem;
     max-width: 100%;
   }
+
+  /* Desktop management workspaces */
+  body > main.management-page {
+    padding-top: 24px;
+    padding-bottom: 40px;
+  }
+
+  .management-page > * { min-width: 0; }
+
+  .management-page .management-hero {
+    margin-bottom: 18px;
+  }
+
+  .management-page .management-hero h1 {
+    font-size: clamp(28px, 2.5vw, 36px);
+  }
+
+  .management-overview-page .metric-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .management-overview-page .metric-card {
+    padding: 16px;
+  }
+
+  .management-overview-page .metric-unavailable {
+    align-self: start;
+    padding-block: 13px;
+  }
+
+  .management-overview-page .metric-unavailable dd {
+    margin-top: 3px;
+    font-size: 14px;
+  }
+
+  .management-overview-page .metric-unavailable small {
+    margin-top: 2px;
+    font-size: 11.5px;
+  }
+
+  .management-overview-page .management-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .management-overview-page .management-link {
+    min-height: 0;
+    padding: 16px 18px;
+  }
+
+  .daily-updates-page .operation-grid {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: 18px;
+  }
+
+  .daily-updates-page #previewSection {
+    margin-top: 24px;
+  }
+
+  .daily-updates-page .preview-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(32rem, 48vh);
+    padding-right: 5px;
+    overflow-y: auto;
+  }
+
+  .risk-alerts-page {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .risk-alerts-page > .management-hero {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+
+  .risk-alerts-page > section[aria-labelledby="resultsHeading"] {
+    min-width: 0;
+  }
+
+  .risk-alerts-page .management-alerts {
+    max-height: min(38rem, calc(100dvh - 15rem));
+    padding-right: 5px;
+    overflow-y: auto;
+  }
+
+  .school-account-page #accountContent {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .school-account-page .account-grid {
+    display: contents;
+  }
+
+  .school-account-page .privacy-card {
+    grid-column: 1 / -1;
+  }
+
+  .school-account-page .security-list {
+    columns: 2;
+    column-gap: 36px;
+  }
+
+  .school-account-page .security-list li {
+    break-inside: avoid;
+  }
 }
 
 @media (min-width: 1440px) {
