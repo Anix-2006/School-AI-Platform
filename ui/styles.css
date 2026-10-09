@@ -1655,6 +1655,7 @@ button.secondary:hover {
 .teacher-skeleton { height: 54px; border-radius: 12px; }
 .teacher-empty { margin: 0; padding: 22px 8px; text-align: center; }
 .desktop-only { display: none; }
+.desktop-week-only { display: none; }
 
 .today-list,
 .task-list,
@@ -1902,6 +1903,240 @@ button.secondary:hover {
     padding: 11px;
     background: var(--panel);
   }
+}
+
+@media (min-width: 1024px) {
+  .teacher-page {
+    padding-top: 24px;
+    padding-bottom: 40px;
+  }
+
+  .teacher-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem);
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+
+  .teacher-hero h1 {
+    max-width: none;
+    font-size: clamp(28px, 2.5vw, 34px);
+  }
+
+  .teacher-hero .lead {
+    margin-top: 4px;
+    font-size: 14px;
+  }
+
+  .teacher-desktop-layout {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+      "profile profile profile profile syllabus syllabus syllabus syllabus syllabus syllabus syllabus syllabus"
+      "timetable timetable timetable timetable timetable timetable timetable timetable tasks tasks tasks tasks"
+      "students students students students students students students students students students students students";
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .teacher-dashboard { display: contents; }
+
+  .teacher-profile {
+    grid-area: profile;
+    grid-template-columns: 52px minmax(0, 1fr);
+    align-content: center;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 18px;
+    overflow: hidden;
+  }
+
+  .teacher-avatar {
+    width: 52px;
+    height: 52px;
+  }
+
+  .profile-facts {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+  }
+
+  .profile-fact {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timetable-card { grid-area: timetable; }
+  .tasks-card { grid-area: tasks; }
+  .syllabus-card { grid-area: syllabus; }
+  .students-card { grid-area: students; }
+
+  .teacher-card {
+    min-width: 0;
+    padding: 18px;
+    overflow: hidden;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .teacher-card:hover {
+    border-color: #bfd2ca;
+    box-shadow: 0 8px 24px rgba(23, 51, 46, 0.1);
+  }
+
+  .teacher-section-heading { margin-bottom: 12px; }
+  .teacher-section-heading h2 { font-size: 19px; }
+
+  .syllabus-card #syllabus {
+    max-height: 12rem;
+    padding-right: 5px;
+    overflow-y: auto;
+  }
+
+  .syllabus-groups {
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+
+  .syllabus-group { padding: 12px; }
+  .chapter-list { max-height: 5.5rem; overflow-y: auto; }
+
+  .tasks-card .task-list {
+    max-height: 28rem;
+    padding-right: 4px;
+    overflow-y: auto;
+  }
+
+  .task-card {
+    grid-template-columns: 22px minmax(0, 1fr);
+    transition: border-color 140ms ease, background 140ms ease;
+  }
+
+  .task-card:hover {
+    border-color: #b9d5cb;
+    background: #f5faf7;
+  }
+
+  .task-card .chip {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .tablet-week-scroll { display: none; }
+  .desktop-week-only { display: block; }
+
+  .desktop-week-scroll {
+    max-width: 100%;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .week-table {
+    min-width: 760px;
+    margin: 0;
+    table-layout: fixed;
+    font-size: 12px;
+  }
+
+  .week-table th,
+  .week-table td {
+    min-width: 108px;
+    padding: 9px;
+    vertical-align: top;
+    border-width: 0 1px 1px 0;
+  }
+
+  .week-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: var(--muted);
+    background: #f4f6f1;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .week-table .week-time-heading,
+  .week-table .week-time-cell {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    width: 104px;
+    min-width: 104px;
+    background: #faf8f2;
+  }
+
+  .week-table .week-time-heading { z-index: 4; }
+  .week-time-cell strong,
+  .week-time-cell span { display: block; }
+  .week-time-cell span { margin-top: 2px; color: var(--muted); font-weight: 400; }
+  .week-table .today-heading { color: var(--accent); background: var(--accent-soft); }
+  .week-table .today-column { background: rgba(223, 238, 232, 0.28); }
+
+  .week-lesson {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    min-height: 66px;
+    padding: 9px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    transition: border-color 140ms ease, transform 140ms ease;
+  }
+
+  .week-lesson + .week-lesson { margin-top: 6px; }
+  .week-lesson:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .week-lesson > span { color: var(--muted); font-size: 10.5px; line-height: 1.35; }
+  .week-lesson.current-period {
+    padding-left: 12px;
+    background: #eff8f3;
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 var(--accent);
+  }
+
+  .week-lesson .current-label {
+    top: 5px;
+    right: 5px;
+    color: #fff;
+    font-size: 8px;
+  }
+
+  .week-lesson.current-period > strong { padding-right: 28px; }
+
+  .student-table-scroll {
+    max-width: 100%;
+    max-height: min(34rem, 52vh);
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+  }
+
+  .student-table {
+    min-width: 680px;
+    margin: 0;
+  }
+
+  .student-table th,
+  .student-table td {
+    padding: 11px 14px;
+    border-width: 0 0 1px;
+  }
+
+  .student-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f4f6f1;
+  }
+
+  .student-table tbody tr { transition: background 130ms ease; }
+  .student-table tbody tr:hover { background: #f5faf7; }
+  .student-tools input:hover,
+  .student-tools select:hover,
+  .teacher-switch select:hover { border-color: #9fc5b8; }
 }
 
 /* School records */
