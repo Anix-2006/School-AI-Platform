@@ -168,12 +168,13 @@
       studentsList.innerHTML = '<div class="meta">No students yet.</div>';
       return;
     }
-    studentsList.innerHTML = students.map((s) => `
+    studentsList.innerHTML = [...students].reverse().map((s) => `
       <div class="list-item">
         <strong>${s.name}</strong>
         <div class="meta">${s.id} · grade ${s.grade}${s.section ? s.section : ''} · ${s.age_tier}</div>
       </div>
     `).join('');
+    studentsList.scrollTop = 0;
   }
 
   async function refreshGuardians() {
