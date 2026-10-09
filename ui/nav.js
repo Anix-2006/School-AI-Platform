@@ -1,15 +1,17 @@
 (() => {
+  "use strict";
+
   window.APP_NAV = [
-    { href: "/", path: "/", label: "Home — Try the platform", home: true },
-    { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview" },
-    { href: "/flows/parent-chat", path: "/flows/parent-chat", label: "Parent chat" },
-    { href: "/flows/ask-a-helper", path: "/flows/ask-a-helper", label: "Ask a helper" },
-    { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp" },
-    { href: "/flows/daily-updates", path: "/flows/daily-updates", label: "Daily updates" },
-    { href: "/flows/risk-alerts", path: "/flows/risk-alerts", label: "Risk alerts" },
-    { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace" },
-    { href: "/flows/school-records", path: "/flows/school-records", label: "School records" },
-    { href: "/flows/school-account", path: "/flows/school-account", label: "School account" },
+    { href: "/", path: "/", label: "Choose a role", home: true },
+    { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview", group: "Explore" },
+    { href: "/flows/parent-chat", path: "/flows/parent-chat", label: "Parent chat", group: "Parent" },
+    { href: "/flows/ask-a-helper", path: "/flows/ask-a-helper", label: "Ask a helper", group: "Parent" },
+    { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp", group: "Parent" },
+    { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace", group: "Teacher" },
+    { href: "/flows/daily-updates", path: "/flows/daily-updates", label: "Daily updates", group: "Management" },
+    { href: "/flows/risk-alerts", path: "/flows/risk-alerts", label: "Risk alerts", group: "Management" },
+    { href: "/flows/school-records", path: "/flows/school-records", label: "School records", group: "Management" },
+    { href: "/flows/school-account", path: "/flows/school-account", label: "School account", group: "Management" },
   ];
 
   const mount = document.getElementById("app-nav");
@@ -17,15 +19,29 @@
 
   const home = window.APP_NAV.find((item) => item.home);
   const links = window.APP_NAV.filter((item) => !item.home);
-  mount.innerHTML = `
-    <a class="sidebar-home" href="${home.href}" data-path="${home.path}">${home.label}</a>
-    <nav>
-      ${links
-        .map(
-          (item) =>
-            `<a href="${item.href}" data-path="${item.path}">${item.label}</a>`
-        )
-        .join("")}
-    </nav>
-  `;
+  const homeLink = document.createElement("a");
+  homeLink.className = "sidebar-home";
+  homeLink.href = home.href;
+  homeLink.dataset.path = home.path;
+  homeLink.textContent = home.label;
+
+  const nav = document.createElement("nav");
+  nav.setAttribute("aria-label", "Platform pages");
+  let currentGroup = "";
+  links.forEach((item) => {
+    if (item.group !== currentGroup) {
+      currentGroup = item.group;
+      const heading = document.createElement("p");
+      heading.className = "sidebar-group";
+      heading.textContent = currentGroup;
+      nav.appendChild(heading);
+    }
+    const link = document.createElement("a");
+    link.href = item.href;
+    link.dataset.path = item.path;
+    link.textContent = item.label;
+    nav.appendChild(link);
+  });
+
+  mount.replaceChildren(homeLink, nav);
 })();
