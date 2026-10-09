@@ -32,6 +32,12 @@ def test_invalid_age_tier_is_422(client):
     assert res.status_code == 422
 
 
+def test_required_student_text_rejects_empty_or_excel_formula(client):
+    for field, value in (("id", " "), ("name", ""), ("grade", "=1+1")):
+        res = client.post("/students", json={**NEW_STUDENT, field: value})
+        assert res.status_code == 422
+
+
 def test_guardians_list_has_child_and_consent(client):
     res = client.get("/guardians")
     assert res.status_code == 200
