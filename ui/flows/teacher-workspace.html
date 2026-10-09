@@ -43,12 +43,13 @@
     <button type="button" class="secondary" id="retryPage">Try again</button>
   </div>
 
-  <section class="teacher-profile panel" id="profile" aria-labelledby="profileTitle">
-    <div class="skeleton profile-skeleton"></div>
-    <div class="skeleton profile-skeleton short"></div>
-  </section>
+  <div class="teacher-desktop-layout">
+    <section class="teacher-profile panel" id="profile" aria-labelledby="profileTitle">
+      <div class="skeleton profile-skeleton"></div>
+      <div class="skeleton profile-skeleton short"></div>
+    </section>
 
-  <div class="teacher-dashboard">
+    <div class="teacher-dashboard">
     <section class="teacher-card timetable-card" aria-labelledby="timetableTitle">
       <div class="teacher-section-heading">
         <div>
@@ -113,6 +114,7 @@
       </div>
       <div id="students" aria-live="polite"></div>
     </section>
+    </div>
   </div>
 </main>
 
@@ -233,7 +235,7 @@
     if (todaySlots.length) todaySlots.forEach((slot) => mobile.append(slotCard(slot)));
     else mobile.append(emptyState("No periods scheduled today."));
 
-    const scroller = element("div", "week-scroll desktop-only");
+    const scroller = element("div", "week-scroll tablet-week-scroll desktop-only");
     scroller.tabIndex = 0;
     scroller.setAttribute("aria-label", "Weekly timetable. Scroll horizontally if needed.");
     const grid = element("div", "week-grid");
@@ -246,7 +248,62 @@
       grid.append(column);
     });
     scroller.append(grid);
-    replace(mount, mobile, scroller);
+
+    const desktopScroller = element("div", "desktop-week-scroll desktop-week-only");
+    desktopScroller.tabIndex = 0;
+    desktopScroller.setAttribute("aria-label", "Weekly timetable. Scroll horizontally if needed.");
+    const table = element("table", "week-table");
+    const caption = element("caption", "sr-only", "Teacher weekly timetable");
+    const head = element("thead");
+    const headRow = element("tr");
+    headRow.append(element("th", "week-time-heading", "Period / time"));
+    DAYS.forEach((day) => {
+      const dayHeading = element("th", day === today ? "today-heading" : "", day);
+      dayHeading.scope = "col";
+      headRow.append(dayHeading);
+    });
+    head.append(headRow);
+
+    const body = element("tbody");
+    const rowKeys = new Map();
+    state.slots.forEach((slot) => {
+      const key = `${slot.period ?? ""}\u0000${slot.start_time || ""}\u0000${slot.end_time || ""}`;
+      if (!rowKeys.has(key)) rowKeys.set(key, slot);
+    });
+    [...rowKeys.values()]
+      .sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || ""))
+        || Number(a.period || 0) - Number(b.period || 0))
+      .forEach((rowSlot) => {
+        const row = element("tr");
+        const timeCell = element("th", "week-time-cell");
+        timeCell.scope = "row";
+        timeCell.append(
+          element("strong", "", rowSlot.period ? `Period ${rowSlot.period}` : "Period"),
+          element("span", "", `${formatTime(rowSlot.start_time)}${rowSlot.end_time ? ` – ${formatTime(rowSlot.end_time)}` : ""}`)
+        );
+        row.append(timeCell);
+        DAYS.forEach((day) => {
+          const cell = element("td", day === today ? "today-column" : "");
+          const matches = state.slots.filter((slot) =>
+            slot.day_name === day
+            && String(slot.period ?? "") === String(rowSlot.period ?? "")
+            && String(slot.start_time || "") === String(rowSlot.start_time || "")
+            && String(slot.end_time || "") === String(rowSlot.end_time || "")
+          );
+          matches.forEach((slot) => {
+            const lesson = element("div", `week-lesson${isCurrent(slot, now) ? " current-period" : ""}`);
+            if (isCurrent(slot, now)) lesson.append(element("span", "current-label", "Now"));
+            lesson.append(element("strong", "", slot.subject), element("span", "", formatClass(slot)));
+            if (slot.room) lesson.append(element("span", "", `Room ${slot.room}`));
+            cell.append(lesson);
+          });
+          row.append(cell);
+        });
+        body.append(row);
+      });
+    table.append(caption, head, body);
+    desktopScroller.append(table);
+    replace(mount, mobile, scroller, desktopScroller);
   }
 
   function dueLabel(dateValue) {
@@ -386,7 +443,11 @@
       body.append(row);
     });
     table.append(caption, head, body);
-    replace(mount, table);
+    const tableScroll = element("div", "student-table-scroll");
+    tableScroll.tabIndex = 0;
+    tableScroll.setAttribute("aria-label", "Student list. Scroll to view more students.");
+    tableScroll.append(table);
+    replace(mount, tableScroll);
   }
 
   function renderProfile(profile) {

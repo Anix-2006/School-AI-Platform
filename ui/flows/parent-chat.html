@@ -90,6 +90,7 @@
         <h2 id="updatesTitle" data-i18n="updates">Updates</h2>
       </div>
       <p data-i18n="updatesHelp">Choose an action to ask for current information.</p>
+      <div id="desktopQuickActions" class="parent-desktop-quick-actions" aria-label="Quick actions"></div>
       <div id="updateActions" class="update-actions"></div>
       <p class="availability-note" data-i18n="structuredUnavailable">Structured update cards are not available from this API. Answers below come from the school assistant.</p>
       <div class="service-status">
@@ -195,8 +196,10 @@
 
   function renderActions(context) {
     const quick = document.getElementById("quickActions");
+    const desktopQuick = document.getElementById("desktopQuickActions");
     const updates = document.getElementById("updateActions");
     quick.replaceChildren();
+    desktopQuick.replaceChildren();
     updates.replaceChildren();
     actionDefinitions(context).forEach((action) => {
       const button = document.createElement("button");
@@ -207,6 +210,10 @@
       button.textContent = SchoolAPI.t(action.key, currentLanguage());
       button.addEventListener("click", chooseAction);
       quick.appendChild(button);
+
+      const desktopQuickButton = button.cloneNode(true);
+      desktopQuickButton.addEventListener("click", chooseAction);
+      desktopQuick.appendChild(desktopQuickButton);
 
       const updateButton = button.cloneNode(true);
       updateButton.className = "update-action";
@@ -328,6 +335,16 @@
       });
       const preferred = SchoolAPI.normalizeLanguage(contexts[0].preferred_language);
       languageSelect.value = preferred;
+      const sidebarLanguage = document.getElementById("sidebarLanguage");
+      if (sidebarLanguage instanceof HTMLSelectElement) {
+        sidebarLanguage.value = preferred;
+      }
+      document.documentElement.lang = preferred;
+      try {
+        sessionStorage.setItem("school.interfaceLanguage", preferred);
+      } catch {
+        // The selected language still applies when storage is unavailable.
+      }
       document.getElementById("authMeta").textContent =
         auth.schoolName || SchoolAPI.t("schoolConnected", preferred);
       pageState.hidden = true;

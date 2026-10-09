@@ -218,6 +218,15 @@
     submit: byId("submitCreate"),
     toast: byId("toast"),
   };
+  const desktopRecords = window.matchMedia("(min-width: 1024px)");
+
+  function syncFilterVisibility() {
+    if (desktopRecords.matches) {
+      elements.filters.hidden = false;
+      return;
+    }
+    elements.filters.hidden = byId("filterToggle").getAttribute("aria-expanded") !== "true";
+  }
 
   function textElement(tag, text, className) {
     const element = document.createElement(tag);
@@ -549,6 +558,7 @@
     byId("filterToggle").setAttribute("aria-expanded", String(!expanded));
     elements.filters.hidden = expanded;
   });
+  desktopRecords.addEventListener("change", syncFilterVisibility);
   byId("clearFilters").addEventListener("click", () => {
     elements.grade.value = "";
     elements.section.value = "";
@@ -608,6 +618,7 @@
     }
   });
 
+  syncFilterVisibility();
   loadRecords();
 })();
 </script>
