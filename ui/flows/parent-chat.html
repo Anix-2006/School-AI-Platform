@@ -300,7 +300,10 @@
   document.getElementById("newConversation").addEventListener("click", resetConversation);
   printButton.addEventListener("click", () => window.print());
   guardianSelect.addEventListener("change", renderContext);
-  languageSelect.addEventListener("change", applyLanguage);
+  languageSelect.addEventListener("change", () => {
+    applyLanguage();
+    resetConversation();
+  });
 
   Promise.all([SchoolAPI.ensureAuth(), SchoolAPI.listParentContexts()])
     .then(([auth, items]) => {
