@@ -137,6 +137,12 @@
     return languageSelect.value;
   }
 
+  function scrollMessagesToEnd() {
+    window.requestAnimationFrame(() => {
+      messages.scrollTop = messages.scrollHeight;
+    });
+  }
+
   function addBubble(text, who, agent, options = {}) {
     const article = document.createElement("article");
     article.className = `bubble ${who}`;
@@ -162,7 +168,7 @@
     }
     article.appendChild(footer);
     messages.appendChild(article);
-    messages.scrollTop = messages.scrollHeight;
+    scrollMessagesToEnd();
     return article;
   }
 
@@ -246,7 +252,7 @@
     typing.hidden = false;
     errorBox.hidden = true;
     updateSendState();
-    messages.scrollTop = messages.scrollHeight;
+    scrollMessagesToEnd();
     try {
       const data = await SchoolAPI.chat({
         guardian_id: String(context.id),
