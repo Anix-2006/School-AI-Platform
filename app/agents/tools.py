@@ -9,7 +9,13 @@ from langchain_core.tools import tool
 from app.database import SessionLocal
 from app.models.student import Student, Guardian
 from app.models.academic import Attendance, DailyDiary, AssessmentRecord, MilestoneRecord, SyllabusProgress
+from app.services.excel_teacher_store import get_store
 from app.services.rag_service import search_curriculum
+
+# Same labels as AssessmentRecord.term, in the order a school year runs.
+# An unrecognised label never outranks one of these.
+_CANONICAL_TERMS = ("FA1", "FA2", "SA1", "SA2")
+_TOPIC_FIELDS = ("title", "kind", "status", "description")
 
 
 @tool
@@ -139,7 +145,116 @@ def search_cbse_curriculum(query: str, grade: str, subject: str) -> str:
     return search_curriculum(query=query, grade=grade, subject=subject)
 
 
+def _norm(value: str) -> str:
+    return (value or "").strip().casefold()
+
+
+def _same_class(row: dict, grade: str, section: str) -> bool:
+    return (row.get("grade") or "").strip() == (grade or "").strip() and (
+        (row.get("section") or "").strip() == (section or "").strip()
+    )
+
+
+def _empty_topics(subject: str) -> dict:
+    label = (subject or "").strip() or "this subject"
+    return {
+        "topics": [],
+        "note": f"No {label} topics have been entered for this class yet.",
+    }
+
+
+def _latest_term(rows: list[dict]) -> str:
+    """Latest academic term among rows that already match class and subject.
+
+    FA1, FA2, SA1, SA2 follow assessment-record order. Any other label keeps
+    the order it first appears in the sheet and is used only when none of
+    those four terms have a matching row. Topics from other terms are dropped
+    by the caller.
+    """
+    first_seen: list[str] = []
+    for row in rows:
+        label = (row.get("term") or "").strip()
+        if label and label not in first_seen:
+            first_seen.append(label)
+    for canonical in reversed(_CANONICAL_TERMS):
+        for seen in first_seen:
+            if _norm(seen) == _norm(canonical):
+                return seen
+    if not first_seen:
+        return ""
+    return first_seen[-1]
+
+
+@tool
+def get_term_topics_for_student(student_id: str, subject: str, term: str = "") -> dict:
+    """Topics a student's class is being taught in one subject this term,
+    plus the subject teacher's name. Uses school-entered rows only."""
+    store = get_store()
+    student = next((row for row in store.get("students", []) if row.get("id") == student_id), None)
+    if not student:
+        return {"error": "student not found"}
+
+    grade = student.get("grade") or ""
+    section = student.get("section") or ""
+    subject_key = _norm(subject)
+
+    # Class subject teachers are the `subjects` rows (grade, section, subject).
+    # `assignments` is per student and has no grade or section.
+    assignment = next(
+        (
+            row
+            for row in store.get("subjects", [])
+            if _same_class(row, grade, section) and _norm(row.get("subject", "")) == subject_key
+        ),
+        None,
+    )
+    display_subject = (assignment.get("subject") if assignment else subject).strip()
+    if not assignment:
+        return _empty_topics(display_subject)
+
+    teacher_id = (assignment.get("teacher_id") or "").strip()
+    teacher = next((row for row in store.get("teachers", []) if row.get("id") == teacher_id), None)
+    teacher_name = (teacher.get("name") or "").strip() if teacher else ""
+    if not teacher_name:
+        return _empty_topics(display_subject)
+
+    matched = []
+    for row in store.get("teacher_term_topics", []):
+        if not _same_class(row, grade, section):
+            continue
+        if _norm(row.get("subject", "")) != subject_key:
+            continue
+        row_teacher = (row.get("teacher_id") or "").strip()
+        if row_teacher and row_teacher != teacher_id:
+            continue
+        matched.append(row)
+    if not matched:
+        return _empty_topics(display_subject)
+
+    requested = (term or "").strip()
+    if requested:
+        chosen = [row for row in matched if _norm(row.get("term", "")) == _norm(requested)]
+        if not chosen:
+            return _empty_topics(display_subject)
+        term_label = (chosen[0].get("term") or requested).strip()
+    else:
+        term_label = _latest_term(matched)
+        if not term_label:
+            return _empty_topics(display_subject)
+        chosen = [row for row in matched if _norm(row.get("term", "")) == _norm(term_label)]
+
+    topics = [{field: row.get(field) or "" for field in _TOPIC_FIELDS} for row in chosen]
+    subject_label = (chosen[0].get("subject") or display_subject).strip()
+    return {
+        "subject": subject_label,
+        "term": term_label,
+        "teacher": teacher_name,
+        "topics": topics,
+    }
+
+
 DAILY_UPDATE_TOOLS = [get_student_profile, get_attendance, get_daily_diary]
 ACADEMIC_TOOLS = [get_student_profile, get_assessment_records, get_milestone_records, get_syllabus_progress]
 COMMUNICATION_TOOLS = [get_student_profile, get_attendance, get_daily_diary, search_cbse_curriculum]
 INSIGHT_TOOLS = [get_attendance, get_assessment_records]
+PARENT_TEACHER_TOOLS = [*COMMUNICATION_TOOLS, get_term_topics_for_student]

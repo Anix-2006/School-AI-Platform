@@ -24,6 +24,7 @@ SHEETS = (
     "syllabus",
     "students",
     "attendance",
+    "teacher_term_topics",
 )
 
 
@@ -92,12 +93,15 @@ def write_demo_workbook(path: Path | None = None) -> Path:
             ["id", "tenant_id", "name", "email", "role", "active"],
             ["t1", tenant, "Priya Sharma", "priya.sharma@demo-school.edu", "class_teacher", "true"],
             ["t2", tenant, "Arjun Rao", "arjun.rao@demo-school.edu", "subject_teacher", "true"],
+            ["t3", tenant, "Kavita Nair", "kavita.nair@demo-school.edu", "subject_teacher", "true"],
         ],
         "subjects": [
             ["id", "teacher_id", "subject", "grade", "section"],
             ["ts1", "t1", "Math", "3", "A"],
             ["ts2", "t1", "English", "3", "A"],
             ["ts3", "t2", "Science", "3", "A"],
+            ["ts4", "t3", "Mathematics", "3", "A"],
+            ["ts5", "t2", "Mathematics", "4", "B"],
         ],
         "assignments": [
             ["id", "teacher_id", "student_id", "relationship", "subject"],
@@ -109,6 +113,8 @@ def write_demo_workbook(path: Path | None = None) -> Path:
             ["ta6", "t1", "s2", "subject_teacher", "English"],
             ["ta7", "t2", "s1", "subject_teacher", "Science"],
             ["ta8", "t2", "s2", "subject_teacher", "Science"],
+            ["ta9", "t3", "s-3-1", "subject_teacher", "Mathematics"],
+            ["ta10", "t2", "s3", "subject_teacher", "Mathematics"],
         ],
         "timetable": [
             ["id", "teacher_id", "day_of_week", "period", "start_time", "end_time", "grade", "section", "subject", "room"],
@@ -145,11 +151,23 @@ def write_demo_workbook(path: Path | None = None) -> Path:
             ["s1", tenant, "Ananya", "3", "A", "primary"],
             ["s2", tenant, "Rahul", "3", "A", "primary"],
             ["s3", tenant, "Meera", "4", "B", "primary"],
+            ["s-3-1", tenant, "Diya Sen", "3", "A", "primary"],
         ],
         "attendance": [
             ["id", "student_id", "date", "present"],
             [f"att-s1-{today.isoformat()}", "s1", today.isoformat(), "true"],
             [f"att-s2-{today.isoformat()}", "s2", today.isoformat(), "false"],
+        ],
+        # FA2 is not the last row. A later alphabetical label is included so
+        # callers must use academic term order, not sheet order or A–Z.
+        "teacher_term_topics": [
+            ["id", "tenant_id", "teacher_id", "grade", "section", "subject", "term", "title", "kind", "status", "description"],
+            ["tt1", tenant, "t3", "3", "A", "Mathematics", "FA2", "Adding 3-digit numbers", "topic", "in_progress", "Regrouping hundreds, tens, and ones."],
+            ["tt2", tenant, "t3", "3", "A", "Mathematics", "FA2", "Number stories", "project", "in_progress", "Students write and solve their own addition stories."],
+            ["tt3", tenant, "t3", "3", "A", "Mathematics", "FA1", "Place value to 999", "topic", "completed", "Hundreds, tens, and ones up to 999."],
+            ["tt4", tenant, "t3", "3", "A", "Mathematics", "ZZ Late Label", "Later label", "topic", "not_started", "Not the current academic term."],
+            ["tt5", tenant, "t2", "4", "B", "Mathematics", "FA2", "Grade 4 fractions", "topic", "in_progress", "Halves and quarters for grade 4."],
+            ["tt6", tenant, "t2", "3", "A", "Mathematics", "FA2", "Other teacher draft", "topic", "in_progress", "Draft entered by a different teacher."],
         ],
     }
 
@@ -179,6 +197,15 @@ def _load() -> dict[str, list[dict]]:
         data = {name: _rows(wb[name]) if name in wb.sheetnames else [] for name in SHEETS}
         wb.close()
     return data
+
+
+def get_store() -> dict[str, list[dict]]:
+    """Load the teacher-workspace workbook.
+
+    Agent tools read sheets through this function. Keys match ``SHEETS``.
+    A sheet that is missing from an older file is an empty list.
+    """
+    return _load()
 
 
 def get_teacher(tenant_id: str, teacher_id: str) -> dict | None:
