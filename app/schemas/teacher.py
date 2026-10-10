@@ -11,6 +11,11 @@ class TeacherSubjectOut(BaseModel):
     section: str
 
 
+class TeacherListItem(BaseModel):
+    id: str
+    name: str
+
+
 class TeacherMeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -18,6 +23,7 @@ class TeacherMeOut(BaseModel):
     name: str
     email: str | None = None
     role: str
+    class_teacher_of: list[str] = []
     subjects: list[TeacherSubjectOut] = []
 
 

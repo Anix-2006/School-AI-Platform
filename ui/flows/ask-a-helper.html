@@ -4,88 +4,185 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ask a helper — School Parent AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-<header class="topbar">
-  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
-  <a class="topbar-brand" href="/">School Parent AI</a>
+<body class="parent-body">
+<header class="topbar parent-topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <a class="topbar-brand" href="/" data-i18n="appName">School Parent AI</a>
+  <span class="topbar-spacer"></span>
+  <label class="sr-only" for="interfaceLanguage" data-i18n="language">Interface language</label>
+  <select class="language-select" id="interfaceLanguage">
+    <option value="en">English</option><option value="hi">हिन्दी</option><option value="te">తెలుగు</option>
+  </select>
 </header>
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 <aside class="sidebar" id="sidebar" aria-label="App pages">
-  <div class="sidebar-header">
-    <h2>Pages</h2>
-    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
-  </div>
+  <div class="sidebar-header"><h2>Pages</h2><button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
 
-  <h1>Ask a helper</h1>
-  <p class="lead">Agent routing: pick the kind of question, send it, and see which specialist answered.</p>
-  <div class="helper-pick">
-    <button type="button" class="helper-card selected" data-q="Was Ananya present today? Any homework?">
-      <h3>Daily update</h3>
-      <p>Attendance, homework, or care log for today.</p>
-    </button>
-    <button type="button" class="helper-card" data-q="How did Ananya do in FA1 Mathematics this term?">
-      <h3>Academic</h3>
-      <p>Marks, rank card, syllabus, or milestones.</p>
-    </button>
-    <button type="button" class="helper-card" data-q="Can I meet the class teacher this week about Ananya?">
-      <h3>Communication</h3>
-      <p>General concerns and teacher requests.</p>
-    </button>
+<main class="page helper-page">
+  <div class="parent-page-heading">
+    <div><p class="eyebrow" data-i18n="helper">Helper</p><h1 data-i18n="askHelper">Ask a helper</h1><p class="lead" data-i18n="helperLead">Choose a topic. The orchestrator will send it to the right school helper.</p></div>
+    <div class="compact-switcher"><label for="routeGuardian" data-i18n="child">Child</label><select id="routeGuardian"><option value="">Loading…</option></select></div>
   </div>
-  <div class="panel">
-    <label for="routeStudent">Student ID</label>
-    <input id="routeStudent" value="s1">
-    <label for="routeMessage">Message</label>
-    <textarea id="routeMessage">Was Ananya present today? Any homework?</textarea>
-    <div class="actions">
-      <button type="button" id="routeSend">Send to orchestrator</button>
+
+  <div id="helperState" class="state state-loading" data-i18n="loadingChildren">Loading children…</div>
+  <section id="helperExperience" hidden>
+    <div class="helper-pick" id="helperPick"></div>
+    <div class="panel helper-compose">
+      <label for="routeMessage" data-i18n="message">Message</label>
+      <textarea id="routeMessage" data-i18n-placeholder="messagePlaceholder" placeholder="Ask about your child…"></textarea>
+      <div class="actions"><button type="button" id="routeSend" disabled><span data-i18n="send">Send</span></button></div>
+      <div id="routeError" class="error retry-row" role="alert" hidden>
+        <span id="routeErrorText"></span>
+        <button type="button" class="secondary" id="routeRetry" data-i18n="retry">Try again</button>
+      </div>
+      <article id="routeResult" class="route-result" aria-live="polite" hidden>
+        <header><span data-i18n="routedTo">Routed to</span>: <strong id="routeAgent"></strong></header>
+        <p id="routeDecision" class="meta"></p>
+        <p id="routeReply"></p>
+      </article>
     </div>
-    <div id="routeError" class="error" hidden></div>
-    <div id="routeResult" class="result-box" hidden></div>
-  </div>
-
+  </section>
 </main>
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
-
 <script>
 (() => {
-  const msg = document.getElementById('routeMessage');
-  document.querySelectorAll('.helper-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.helper-card').forEach((c) => c.classList.remove('selected'));
-      card.classList.add('selected');
-      msg.value = card.getAttribute('data-q');
+  "use strict";
+  const guardianSelect = document.getElementById("routeGuardian");
+  const languageSelect = document.getElementById("interfaceLanguage");
+  const message = document.getElementById("routeMessage");
+  const send = document.getElementById("routeSend");
+  const errorBox = document.getElementById("routeError");
+  const result = document.getElementById("routeResult");
+  let contexts = [];
+  let waiting = false;
+  let selectedTopic = "daily";
+
+  const topics = {
+    daily: { title: "dailyUpdate", help: "dailyHelp", prompt: "Was my child present today, and is there any homework?" },
+    academic: { title: "academic", help: "academicHelp", prompt: "What syllabus and learning progress information is available for my child?" },
+    teacher: { title: "parentTeacher", help: "parentTeacherHelp", prompt: "Can I meet the class teacher this week?" },
+    communication: { title: "communication", help: "communicationHelp", prompt: "Are there any upcoming school events or notices?" },
+  };
+
+  function context() {
+    return contexts.find((item) => String(item.id) === guardianSelect.value);
+  }
+
+  function renderTopics() {
+    const pick = document.getElementById("helperPick");
+    pick.replaceChildren();
+    Object.entries(topics).forEach(([key, topic]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `helper-card${key === selectedTopic ? " selected" : ""}`;
+      const title = document.createElement("h2");
+      title.textContent = SchoolAPI.t(topic.title, languageSelect.value);
+      const copy = document.createElement("p");
+      copy.textContent = SchoolAPI.t(topic.help, languageSelect.value);
+      button.append(title, copy);
+      button.addEventListener("click", () => {
+        selectedTopic = key;
+        message.value = topic.prompt;
+        renderTopics();
+        updateSend();
+        message.focus();
+      });
+      pick.appendChild(button);
     });
-  });
-  document.getElementById('routeSend').addEventListener('click', async () => {
-    const err = document.getElementById('routeError');
-    const box = document.getElementById('routeResult');
-    err.hidden = true; box.hidden = true;
+  }
+
+  function updateSend() {
+    send.disabled = waiting || !message.value.trim() || !guardianSelect.value;
+    send.querySelector("span").textContent = SchoolAPI.t(waiting ? "sending" : "send", languageSelect.value);
+  }
+
+  function applyLanguage() {
+    SchoolAPI.localize(document, languageSelect.value);
+    renderTopics();
+    updateSend();
+  }
+
+  async function submit() {
+    const selected = context();
+    if (!selected || !message.value.trim() || waiting) return;
+    waiting = true;
+    errorBox.hidden = true;
+    result.hidden = true;
+    updateSend();
     try {
       const data = await SchoolAPI.chat({
-        guardian_id: 'g-route',
-        student_id: document.getElementById('routeStudent').value.trim() || null,
-        message: msg.value.trim(),
-        language: 'en',
+        guardian_id: String(selected.id),
+        student_id: String(selected.student_id),
+        message: message.value.trim(),
+        session_id: `helper-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       });
-      box.hidden = false;
-      box.textContent = 'Routed to: ' + (data.agent_used || 'unknown') + '\n\n' + (data.reply || '');
-    } catch (e) {
-      err.hidden = false; err.textContent = e.message;
+      document.getElementById("routeAgent").textContent = data.agent_used || "unknown";
+      const source = data.intent_source === "classifier"
+        ? SchoolAPI.t("decidedByClassifier", languageSelect.value)
+        : SchoolAPI.t("decidedByRouter", languageSelect.value);
+      const confidence = typeof data.intent_confidence === "number"
+        ? ` · ${Math.round(data.intent_confidence * 100)}% ${SchoolAPI.t("confidence", languageSelect.value)}`
+        : "";
+      document.getElementById("routeDecision").textContent = `${source}${confidence}`;
+      document.getElementById("routeReply").textContent = data.reply || "";
+      result.hidden = false;
+    } catch (error) {
+      document.getElementById("routeErrorText").textContent = error.message;
+      errorBox.hidden = false;
+    } finally {
+      waiting = false;
+      updateSend();
     }
+  }
+
+  guardianSelect.addEventListener("change", () => {
+    result.hidden = true;
+    selectedTopic = "daily";
+    message.value = topics.daily.prompt;
+    renderTopics();
+    updateSend();
+  });
+  languageSelect.addEventListener("change", applyLanguage);
+  message.addEventListener("input", updateSend);
+  message.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submit();
+    }
+  });
+  send.addEventListener("click", submit);
+  document.getElementById("routeRetry").addEventListener("click", submit);
+
+  SchoolAPI.listParentContexts().then((items) => {
+    contexts = items;
+    guardianSelect.replaceChildren();
+    if (!contexts.length) {
+      document.getElementById("helperState").textContent = SchoolAPI.t("noGuardians", languageSelect.value);
+      return;
+    }
+    contexts.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = String(item.id);
+      option.textContent = `${item.student_name} — ${item.name}`;
+      guardianSelect.appendChild(option);
+    });
+    languageSelect.value = SchoolAPI.normalizeLanguage(contexts[0].preferred_language);
+    document.getElementById("helperState").hidden = true;
+    document.getElementById("helperExperience").hidden = false;
+    message.value = topics.daily.prompt;
+    applyLanguage();
+  }).catch((error) => {
+    const state = document.getElementById("helperState");
+    state.className = "state state-error";
+    state.textContent = error.message;
   });
 })();
 </script>
-
 </body>
 </html>

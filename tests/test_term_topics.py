@@ -1,13 +1,6 @@
 """Term topics for the parent–teacher agent. Run with: pytest tests/test_term_topics.py"""
 
 import json
-import os
-
-os.environ.setdefault("OPENAI_API_KEY", "test-key")
-os.environ.setdefault("DATABASE_URL", "sqlite:///./dev.db")
-
-import pytest
-from openpyxl import load_workbook
 
 from app.agents.tools import (
     ACADEMIC_TOOLS,
@@ -17,17 +10,8 @@ from app.agents.tools import (
     PARENT_TEACHER_TOOLS,
     get_term_topics_for_student,
 )
-from app.services.excel_teacher_store import write_demo_workbook
 
 FA2_TITLES = ["Adding 3-digit numbers", "Number stories"]
-
-
-@pytest.fixture
-def workbook(tmp_path, monkeypatch):
-    xlsx = tmp_path / "teacher_workspace.xlsx"
-    write_demo_workbook(xlsx)
-    monkeypatch.setattr("app.services.excel_teacher_store.settings.teacher_excel_path", str(xlsx))
-    return xlsx
 
 
 def _topics(student_id: str, subject: str, term: str = "") -> dict:
@@ -95,35 +79,23 @@ def test_explicit_term_does_not_mix_other_terms(workbook):
 def test_other_classes_and_teachers_do_not_leak(workbook):
     grade_three = _topics("s-3-1", "Mathematics")
     titles = [row["title"] for row in grade_three["topics"]]
-    assert "Grade 4 fractions" not in titles
+    assert "Grade 7 algebra" not in titles
     assert "Other teacher draft" not in titles
     assert grade_three["teacher"] == "Kavita Nair"
 
-    grade_four = _topics("s3", "Mathematics")
-    assert grade_four["teacher"] == "Arjun Rao"
-    assert [row["title"] for row in grade_four["topics"]] == ["Grade 4 fractions"]
-    assert "Adding 3-digit numbers" not in [row["title"] for row in grade_four["topics"]]
+    grade_seven = _topics("s-7-1", "Mathematics")
+    assert grade_seven["teacher"] == "Manoj Pillai"
+    assert [row["title"] for row in grade_seven["topics"]] == ["Grade 7 algebra"]
+    assert "Adding 3-digit numbers" not in [row["title"] for row in grade_seven["topics"]]
 
 
 def test_result_omits_contact_details_and_internal_ids(workbook):
-    wb = load_workbook(workbook)
-    ws = wb["teachers"]
-    headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
-    phone_col = len(headers) + 1
-    ws.cell(1, phone_col, "phone")
-    id_col = headers.index("id") + 1
-    for row_idx in range(2, ws.max_row + 1):
-        if ws.cell(row_idx, id_col).value == "t3":
-            ws.cell(row_idx, phone_col, "9876543210")
-    wb.save(workbook)
-    wb.close()
-
     result = _topics("s-3-1", "Mathematics")
     blob = json.dumps(result)
-    assert "kavita.nair@demo-school.edu" not in blob
-    assert "9876543210" not in blob
+    assert "kavita.nair@demo-school.example" not in blob
+    assert "919100000001" not in blob
     assert "demo-school" not in blob
-    assert "t3" not in blob
+    assert "t-1" not in blob
 
     keys = set()
 
@@ -142,8 +114,8 @@ def test_result_omits_contact_details_and_internal_ids(workbook):
 
 def test_tool_is_bound_only_to_parent_teacher_agent():
     import app.agents.academic_agent as academic_agent
-    import app.agents.communication_agent as parent_agent
     import app.agents.daily_update_agent as daily_agent
+    import app.agents.parent_teacher_agent as parent_agent
 
     assert get_term_topics_for_student in PARENT_TEACHER_TOOLS
     assert get_term_topics_for_student in parent_agent.PARENT_TEACHER_TOOLS
@@ -165,7 +137,7 @@ def test_tool_is_bound_only_to_parent_teacher_agent():
 
 
 def test_parent_teacher_prompt_uses_the_tool():
-    from app.agents.communication_agent import SYSTEM_PROMPT
+    from app.agents.parent_teacher_agent import SYSTEM_PROMPT
 
     text = " ".join(SYSTEM_PROMPT.split())
     assert "get_term_topics_for_student" in text

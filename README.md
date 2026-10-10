@@ -4,11 +4,11 @@ Multi-agent AI system for CBSE schools (Pre-primary through Grade 7) that sends
 parents daily updates, syllabus/academic progress, and rank cards over
 WhatsApp/voice, backed by a LangGraph orchestrator running on OpenAI models.
 
-## Architecture
+## Architecture -
 
 Client (WhatsApp/voice/app) -> FastAPI gateway -> LangGraph orchestrator
 -> specialist agent nodes (daily update, academic, communication, insight)
--> Postgres (tenant-isolated) + vector store (CBSE curriculum RAG).
+-> demo data in `data/school_data.xlsx` (one sheet per table, tenant-isolated).
 
 See `app/agents/orchestrator.py` for the graph definition.
 
@@ -18,30 +18,39 @@ See `app/agents/orchestrator.py` for the graph definition.
 app/
   main.py            FastAPI app entrypoint
   config.py          Settings (env-driven)
-  database.py         SQLAlchemy session/engine
-  models/            ORM models: tenant, student, academic, conversation
   schemas/           Pydantic request/response schemas
   agents/            LangGraph orchestrator + 4 specialist agents + tools
-  services/          WhatsApp integration, curriculum RAG
+  services/          Excel store (get_store), chat, teacher workspace, WhatsApp, curriculum search
   core/               Auth + multi-tenant isolation helpers
   api/                FastAPI routers (chat, students, webhooks)
-  tasks/              Scheduled batch jobs (daily updates, rank cards)
+  tasks/              Scheduled batch jobs (daily updates, insight scan)
+data/
+  school_data.xlsx    All demo data: students, guardians, teachers, attendance, ...
 tests/
 ```
 
 ## Setup
 
 ```bash
-cp .env.example .env      # fill in OPENAI_API_KEY, DATABASE_URL, WHATSAPP_TOKEN
+cp .env.example .env      # fill in OPENAI_API_KEY, WHATSAPP_TOKEN
 docker compose up --build
 ```
 
 API docs at http://localhost:8000/docs once running.
 
+## Demo data
+
+Every read and write goes through `get_store()` in
+`app/services/excel_store.py`, which loads `data/school_data.xlsx`.
+Edit the workbook and save it - the app picks up the change on the next
+request, no restart needed. Close the file in Excel before using pages
+that write (marking tasks done, adding students, chat history), because
+Windows locks files that are open in Excel. Run a single uvicorn worker.
+
 ## What's production-shaped vs stubbed
 
 Real: agent graph, tool-calling contracts, tenant isolation pattern,
-DB schema, WhatsApp webhook contract, async daily batch job shape.
+data model (workbook sheets), WhatsApp webhook contract, async daily batch job shape.
 
 Stubbed (intentionally, fill in for your deployment): actual WhatsApp
 Business API credentials/templates, real CBSE curriculum content for the
@@ -50,9 +59,9 @@ RAG index (currently a placeholder loader), production auth provider
 
 ## Next steps to harden for real production
 
-1. Swap the in-memory/sqlite dev DB for managed Postgres with row-level
-   security policies per tenant (see `app/core/tenancy.py` for the pattern
-   to extend).
+1. Replace the Excel workbook with a managed database with row-level
+   security policies per tenant (see `app/core/tenancy.py` and keep the
+   `get_store()` interface so callers don't change).
 2. Wire `app/services/rag_service.py` to a real vector DB (pgvector,
    Pinecone, etc.) loaded with actual NCERT/CBSE syllabus content.
 3. Replace the stub WhatsApp client with the real Business API + message

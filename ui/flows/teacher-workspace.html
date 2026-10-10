@@ -4,225 +4,559 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Teacher workspace — School Parent AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="teacher-body">
+<a class="skip-link" href="#main">Skip to main content</a>
 <header class="topbar">
-  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">☰</button>
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
   <a class="topbar-brand" href="/">School Parent AI</a>
 </header>
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 <aside class="sidebar" id="sidebar" aria-label="App pages">
   <div class="sidebar-header">
     <h2>Pages</h2>
-    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
   </div>
   <div id="app-nav"></div>
 </aside>
-<main class="page">
 
-  <h1>Teacher workspace</h1>
-  <p class="lead" id="teacherLead">What to teach today, and who you teach.</p>
-  <p class="note">Roster, timetable, tasks, and syllabus are read from <code>data/teacher_workspace.xlsx</code>. Edit that workbook and refresh this page. Marking a task done writes back to the Tasks sheet.</p>
-  <div id="pageError" class="error" hidden></div>
+<main class="teacher-page" id="main">
+  <header class="teacher-hero">
+    <div>
+      <p class="eyebrow">Teacher workspace</p>
+      <h1>Your school day, at a glance</h1>
+      <p class="lead">Classes, priorities, progress, and students in one place.</p>
+    </div>
+    <div class="teacher-switch">
+      <label for="teacherSelect">Viewing as</label>
+      <select id="teacherSelect" disabled><option value="">Loading teachers…</option></select>
+    </div>
+  </header>
 
-  <div class="stack">
-    <section>
-      <div class="section-bar">
-        <h2>Timetable</h2>
-        <div class="actions" style="margin-top:0">
-          <button type="button" class="secondary" id="viewToday">Today</button>
-          <button type="button" id="viewWeek">Week</button>
-        </div>
-      </div>
-      <div class="timetable-scroll">
-        <div id="timetable" class="empty-state">Loading timetable…</div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Tasks</h2>
-      <div id="tasks" class="list list-tall"><div class="meta">Loading…</div></div>
-    </section>
-
-    <section>
-      <h2>Syllabus this term</h2>
-      <div id="syllabus" class="list list-tall"><div class="meta">Loading…</div></div>
-    </section>
-
-    <section>
-      <h2>My students</h2>
-      <div id="students" class="list list-tall"><div class="meta">Loading…</div></div>
-    </section>
+  <div id="pageError" class="state state-error page-retry" role="alert" hidden>
+    <span id="pageErrorText"></span>
+    <button type="button" class="secondary" id="retryPage">Try again</button>
   </div>
 
+  <div class="teacher-desktop-layout">
+    <section class="teacher-profile panel" id="profile" aria-labelledby="profileTitle">
+      <div class="skeleton profile-skeleton"></div>
+      <div class="skeleton profile-skeleton short"></div>
+    </section>
+
+    <div class="teacher-dashboard">
+    <section class="teacher-card timetable-card" aria-labelledby="timetableTitle">
+      <div class="teacher-section-heading">
+        <div>
+          <p class="eyebrow" id="todayLabel">Today</p>
+          <h2 id="timetableTitle">Timetable</h2>
+        </div>
+        <span class="desktop-only meta">Weekly view</span>
+      </div>
+      <div id="timetable" aria-live="polite"></div>
+    </section>
+
+    <section class="teacher-card tasks-card" aria-labelledby="tasksTitle">
+      <div class="teacher-section-heading">
+        <div>
+          <p class="eyebrow">Priorities</p>
+          <h2 id="tasksTitle">Tasks</h2>
+        </div>
+        <span class="count-badge" id="taskCount">—</span>
+      </div>
+      <div id="tasks" aria-live="polite"></div>
+    </section>
+
+    <section class="teacher-card syllabus-card" aria-labelledby="syllabusTitle">
+      <div class="teacher-section-heading">
+        <div>
+          <p class="eyebrow">This term</p>
+          <h2 id="syllabusTitle">Syllabus progress</h2>
+        </div>
+      </div>
+      <div id="syllabus"></div>
+    </section>
+
+    <section class="teacher-card students-card" aria-labelledby="studentsTitle">
+      <div class="teacher-section-heading">
+        <div>
+          <p class="eyebrow">Classes</p>
+          <h2 id="studentsTitle">My students</h2>
+        </div>
+        <span class="count-badge" id="studentCount">—</span>
+      </div>
+      <div class="student-tools">
+        <label class="student-search">
+          <span class="sr-only">Search students</span>
+          <input type="search" id="studentSearch" placeholder="Search students…" disabled>
+        </label>
+        <label>
+          <span class="sr-only">Filter by grade</span>
+          <select id="gradeFilter" disabled><option value="">All grades</option></select>
+        </label>
+        <label>
+          <span class="sr-only">Filter by section</span>
+          <select id="sectionFilter" disabled><option value="">All sections</option></select>
+        </label>
+        <label>
+          <span class="sr-only">Sort students</span>
+          <select id="studentSort" disabled>
+            <option value="name">Name A–Z</option>
+            <option value="grade">Grade</option>
+            <option value="attendance">Attendance</option>
+          </select>
+        </label>
+      </div>
+      <div id="students" aria-live="polite"></div>
+    </section>
+    </div>
+  </div>
 </main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script src="/nav.js"></script>
 <script src="/sidebar.js"></script>
 <script src="/api.js"></script>
 <script>
 (() => {
-  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-  const err = document.getElementById("pageError");
-  let slots = [];
-  let weekView = true;
+  "use strict";
 
-  function esc(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const state = { slots: [], tasks: [], syllabus: [], students: [], requestId: 0 };
+  const byId = (id) => document.getElementById(id);
+  const teacherSelect = byId("teacherSelect");
+  const controls = ["studentSearch", "gradeFilter", "sectionFilter", "studentSort"].map(byId);
+
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = String(text);
+    return node;
   }
 
-  function chip(status) {
-    const label = (status || "").replace(/_/g, " ");
-    return `<span class="chip ${esc(status)}">${esc(label)}</span>`;
+  function replace(mount, ...children) {
+    mount.replaceChildren(...children.filter(Boolean));
   }
 
-  function showError(message) {
-    err.hidden = false;
-    err.textContent = message;
+  function emptyState(message) {
+    return element("p", "empty-state teacher-empty", message);
+  }
+
+  function statusChip(status) {
+    const value = String(status || "not_started");
+    const chip = element("span", `chip ${value.replace(/[^a-z_]/gi, "")}`, value.replaceAll("_", " "));
+    return chip;
+  }
+
+  function showSkeleton(mount, count = 3) {
+    const wrap = element("div", "teacher-skeletons");
+    for (let index = 0; index < count; index += 1) {
+      const line = element("div", "skeleton teacher-skeleton");
+      wrap.append(line);
+    }
+    replace(mount, wrap);
+  }
+
+  function setLoading(loading) {
+    teacherSelect.disabled = loading;
+    controls.forEach((control) => { control.disabled = loading; });
+    if (!loading) return;
+    showSkeleton(byId("profile"), 2);
+    showSkeleton(byId("timetable"), 4);
+    showSkeleton(byId("tasks"), 3);
+    showSkeleton(byId("syllabus"), 4);
+    showSkeleton(byId("students"), 5);
+  }
+
+  function showError(error) {
+    byId("pageErrorText").textContent = error.message || "Something went wrong. Please try again.";
+    byId("pageError").hidden = false;
+  }
+
+  let toastTimer;
+  function toast(message, tone = "success") {
+    const mount = byId("toast");
+    window.clearTimeout(toastTimer);
+    mount.textContent = message;
+    mount.className = `toast ${tone}`;
+    mount.hidden = false;
+    toastTimer = window.setTimeout(() => { mount.hidden = true; }, 3500);
+  }
+
+  function formatClass(item) {
+    return `Grade ${item.grade}${item.section ? ` · Section ${item.section}` : ""}`;
+  }
+
+  function formatTime(value) {
+    if (!value) return "";
+    const [hours, minutes] = String(value).split(":").map(Number);
+    if (!Number.isFinite(hours)) return "";
+    const date = new Date(2000, 0, 1, hours, minutes);
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  function isCurrent(slot, now = new Date()) {
+    if (slot.day_of_week !== now.getDay() || !slot.start_time || !slot.end_time) return false;
+    const minutes = (value) => {
+      const [hour, minute] = String(value).split(":").map(Number);
+      return hour * 60 + minute;
+    };
+    const current = now.getHours() * 60 + now.getMinutes();
+    return current >= minutes(slot.start_time) && current < minutes(slot.end_time);
+  }
+
+  function slotCard(slot) {
+    const card = element("article", `period-card${isCurrent(slot) ? " current-period" : ""}`);
+    if (isCurrent(slot)) card.append(element("span", "current-label", "Now"));
+    const time = element("div", "period-time");
+    time.append(element("strong", "", formatTime(slot.start_time) || `Period ${slot.period}`));
+    if (slot.end_time) time.append(element("span", "", `– ${formatTime(slot.end_time)}`));
+    const details = element("div", "period-details");
+    details.append(element("strong", "", slot.subject), element("span", "meta", formatClass(slot)));
+    if (slot.room) details.append(element("span", "meta", `Room ${slot.room}`));
+    card.append(time, details);
+    return card;
   }
 
   function renderTimetable() {
-    const mount = document.getElementById("timetable");
-    const jsDay = new Date().getDay();
-    const todayName = jsDay >= 1 && jsDay <= 5 ? DAYS[jsDay - 1] : null;
-    const visibleDays = weekView ? DAYS : (todayName ? [todayName] : DAYS);
+    const mount = byId("timetable");
+    if (!state.slots.length) return replace(mount, emptyState("No periods on the timetable yet."));
 
-    const filtered = slots.filter((s) => visibleDays.includes(s.day_name));
-    if (!filtered.length) {
-      mount.innerHTML = weekView
-        ? '<p class="empty-state">No periods on the timetable yet.</p>'
-        : '<p class="empty-state">No periods today.</p>';
-      return;
-    }
+    const now = new Date();
+    const today = DAYS[now.getDay() - 1];
+    byId("todayLabel").textContent = today || "Today";
+    const mobile = element("div", "today-list");
+    const todaySlots = state.slots.filter((slot) => slot.day_of_week === now.getDay());
+    if (todaySlots.length) todaySlots.forEach((slot) => mobile.append(slotCard(slot)));
+    else mobile.append(emptyState("No periods scheduled today."));
 
-    const periods = [...new Set(filtered.map((s) => s.period))].sort((a, b) => a - b);
-    const byKey = {};
-    filtered.forEach((s) => {
-      byKey[`${s.day_name}-${s.period}`] = s;
+    const scroller = element("div", "week-scroll tablet-week-scroll desktop-only");
+    scroller.tabIndex = 0;
+    scroller.setAttribute("aria-label", "Weekly timetable. Scroll horizontally if needed.");
+    const grid = element("div", "week-grid");
+    const days = DAYS.filter((day) => state.slots.some((slot) => slot.day_name === day));
+    days.forEach((day) => {
+      const column = element("section", "day-column");
+      const heading = element("h3", day === today ? "today-heading" : "", day);
+      column.append(heading);
+      state.slots.filter((slot) => slot.day_name === day).forEach((slot) => column.append(slotCard(slot)));
+      grid.append(column);
     });
+    scroller.append(grid);
 
-    const head = `<tr><th>Period</th>${visibleDays.map((d) => `<th>${esc(d)}</th>`).join("")}</tr>`;
-    const body = periods.map((period) => {
-      const cells = visibleDays.map((day) => {
-        const slot = byKey[`${day}-${period}`];
-        if (!slot) return "<td></td>";
-        const when = slot.start_time ? String(slot.start_time).slice(0, 5) : "";
-        return `<td><div class="slot"><strong>${esc(slot.subject)}</strong><span class="meta">Grade ${esc(slot.grade)}${slot.section ? esc(slot.section) : ""}${slot.room ? " · " + esc(slot.room) : ""}${when ? " · " + esc(when) : ""}</span></div></td>`;
-      }).join("");
-      return `<tr><th>${esc(period)}</th>${cells}</tr>`;
-    }).join("");
+    const desktopScroller = element("div", "desktop-week-scroll desktop-week-only");
+    desktopScroller.tabIndex = 0;
+    desktopScroller.setAttribute("aria-label", "Weekly timetable. Scroll horizontally if needed.");
+    const table = element("table", "week-table");
+    const caption = element("caption", "sr-only", "Teacher weekly timetable");
+    const head = element("thead");
+    const headRow = element("tr");
+    headRow.append(element("th", "week-time-heading", "Period / time"));
+    DAYS.forEach((day) => {
+      const dayHeading = element("th", day === today ? "today-heading" : "", day);
+      dayHeading.scope = "col";
+      headRow.append(dayHeading);
+    });
+    head.append(headRow);
 
-    mount.innerHTML = `<table class="timetable">${head}${body}</table>`;
+    const body = element("tbody");
+    const rowKeys = new Map();
+    state.slots.forEach((slot) => {
+      const key = `${slot.period ?? ""}\u0000${slot.start_time || ""}\u0000${slot.end_time || ""}`;
+      if (!rowKeys.has(key)) rowKeys.set(key, slot);
+    });
+    [...rowKeys.values()]
+      .sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || ""))
+        || Number(a.period || 0) - Number(b.period || 0))
+      .forEach((rowSlot) => {
+        const row = element("tr");
+        const timeCell = element("th", "week-time-cell");
+        timeCell.scope = "row";
+        timeCell.append(
+          element("strong", "", rowSlot.period ? `Period ${rowSlot.period}` : "Period"),
+          element("span", "", `${formatTime(rowSlot.start_time)}${rowSlot.end_time ? ` – ${formatTime(rowSlot.end_time)}` : ""}`)
+        );
+        row.append(timeCell);
+        DAYS.forEach((day) => {
+          const cell = element("td", day === today ? "today-column" : "");
+          const matches = state.slots.filter((slot) =>
+            slot.day_name === day
+            && String(slot.period ?? "") === String(rowSlot.period ?? "")
+            && String(slot.start_time || "") === String(rowSlot.start_time || "")
+            && String(slot.end_time || "") === String(rowSlot.end_time || "")
+          );
+          matches.forEach((slot) => {
+            const lesson = element("div", `week-lesson${isCurrent(slot, now) ? " current-period" : ""}`);
+            if (isCurrent(slot, now)) lesson.append(element("span", "current-label", "Now"));
+            lesson.append(element("strong", "", slot.subject), element("span", "", formatClass(slot)));
+            if (slot.room) lesson.append(element("span", "", `Room ${slot.room}`));
+            cell.append(lesson);
+          });
+          row.append(cell);
+        });
+        body.append(row);
+      });
+    table.append(caption, head, body);
+    desktopScroller.append(table);
+    replace(mount, mobile, scroller, desktopScroller);
   }
 
-  function renderTasks(tasks) {
-    const mount = document.getElementById("tasks");
-    if (!tasks.length) {
-      mount.innerHTML = '<div class="empty-state">No tasks.</div>';
-      return;
+  function dueLabel(dateValue) {
+    if (!dateValue) return "No due date";
+    const date = new Date(`${dateValue}T00:00:00`);
+    return `Due ${date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`;
+  }
+
+  function renderTasks() {
+    const mount = byId("tasks");
+    byId("taskCount").textContent = String(state.tasks.filter((task) => task.status !== "done").length);
+    if (!state.tasks.length) return replace(mount, emptyState("No tasks assigned."));
+    const list = element("div", "task-list");
+    state.tasks.forEach((task) => {
+      const label = element("label", `task-card${task.status === "done" ? " completed-task" : ""}`);
+      const checkbox = element("input", "task-checkbox");
+      checkbox.type = "checkbox";
+      checkbox.checked = task.status === "done";
+      checkbox.disabled = task.status === "done";
+      checkbox.dataset.taskId = String(task.id);
+      checkbox.setAttribute("aria-label", `Mark ${task.title} done`);
+      const copy = element("span", "task-copy");
+      copy.append(element("strong", "", task.title));
+      const meta = element("span", "task-meta");
+      meta.append(element("span", "", dueLabel(task.due_date)));
+      if (task.related_subject) meta.append(element("span", "", task.related_subject));
+      copy.append(meta);
+      label.append(checkbox, copy, statusChip(task.status));
+      list.append(label);
+    });
+    replace(mount, list);
+  }
+
+  function completed(status) {
+    return ["done", "completed"].includes(String(status).toLowerCase());
+  }
+
+  function renderSyllabus() {
+    const mount = byId("syllabus");
+    if (!state.syllabus.length) return replace(mount, emptyState("No syllabus progress is available for your subjects."));
+    const groups = new Map();
+    state.syllabus.forEach((row) => {
+      const key = `${row.subject}\u0000${row.grade}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    });
+    const list = element("div", "syllabus-groups");
+    groups.forEach((rows) => {
+      const done = rows.filter((row) => completed(row.status)).length;
+      const percent = Math.round((done / rows.length) * 100);
+      const group = element("section", "syllabus-group");
+      const header = element("div", "syllabus-header");
+      const title = element("div");
+      title.append(element("h3", "", rows[0].subject), element("p", "meta", `Grade ${rows[0].grade} · ${done} of ${rows.length} chapters`));
+      header.append(title, element("strong", "progress-value", `${percent}%`));
+      const progress = element("div", "progress-track");
+      const fill = element("span", "progress-fill");
+      fill.style.width = `${percent}%`;
+      progress.setAttribute("role", "progressbar");
+      progress.setAttribute("aria-label", `${rows[0].subject}, grade ${rows[0].grade}`);
+      progress.setAttribute("aria-valuenow", String(percent));
+      progress.setAttribute("aria-valuemin", "0");
+      progress.setAttribute("aria-valuemax", "100");
+      progress.append(fill);
+      const chapters = element("ul", "chapter-list");
+      rows.forEach((row) => {
+        const item = element("li");
+        item.append(element("span", "", row.chapter), statusChip(row.status));
+        chapters.append(item);
+      });
+      group.append(header, progress, chapters);
+      list.append(group);
+    });
+    replace(mount, list);
+  }
+
+  function fillFilter(select, values, allLabel) {
+    const current = select.value;
+    const first = element("option", "", allLabel);
+    first.value = "";
+    const options = [...values].filter(Boolean).sort().map((value) => {
+      const option = element("option", "", value);
+      option.value = value;
+      return option;
+    });
+    replace(select, first, ...options);
+    select.value = options.some((option) => option.value === current) ? current : "";
+  }
+
+  function attendanceInfo(value) {
+    if (value === true) return { label: "Present", rank: 0, className: "present" };
+    if (value === false) return { label: "Absent", rank: 2, className: "absent" };
+    return { label: "Not marked", rank: 1, className: "unmarked" };
+  }
+
+  function renderStudents() {
+    const search = byId("studentSearch").value.trim().toLocaleLowerCase();
+    const grade = byId("gradeFilter").value;
+    const section = byId("sectionFilter").value;
+    const sort = byId("studentSort").value;
+    let rows = state.students.filter((student) =>
+      (!search || student.name.toLocaleLowerCase().includes(search) || String(student.id).toLocaleLowerCase().includes(search))
+      && (!grade || String(student.grade) === grade)
+      && (!section || String(student.section || "") === section)
+    );
+    rows = [...rows].sort((a, b) => {
+      if (sort === "grade") return String(a.grade).localeCompare(String(b.grade), undefined, { numeric: true }) || a.name.localeCompare(b.name);
+      if (sort === "attendance") return attendanceInfo(a.present_today).rank - attendanceInfo(b.present_today).rank || a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name);
+    });
+    byId("studentCount").textContent = String(rows.length);
+    const mount = byId("students");
+    if (!state.students.length) return replace(mount, emptyState("No students are assigned to this teacher."));
+    if (!rows.length) return replace(mount, emptyState("No students match these filters."));
+
+    const table = element("table", "student-table");
+    const caption = element("caption", "sr-only", `${rows.length} students`);
+    const head = element("thead");
+    const headRow = element("tr");
+    ["Student", "Grade", "Section", "Attendance"].forEach((text) => headRow.append(element("th", "", text)));
+    head.append(headRow);
+    const body = element("tbody");
+    rows.forEach((student) => {
+      const row = element("tr");
+      const name = element("td");
+      name.dataset.label = "Student";
+      name.append(element("strong", "", student.name), element("span", "student-id", student.id));
+      const gradeCell = element("td", "", student.grade);
+      gradeCell.dataset.label = "Grade";
+      const sectionCell = element("td", "", student.section || "—");
+      sectionCell.dataset.label = "Section";
+      const attendance = attendanceInfo(student.present_today);
+      const attendanceCell = element("td");
+      attendanceCell.dataset.label = "Attendance";
+      attendanceCell.append(element("span", `attendance-badge ${attendance.className}`, attendance.label));
+      row.append(name, gradeCell, sectionCell, attendanceCell);
+      body.append(row);
+    });
+    table.append(caption, head, body);
+    const tableScroll = element("div", "student-table-scroll");
+    tableScroll.tabIndex = 0;
+    tableScroll.setAttribute("aria-label", "Student list. Scroll to view more students.");
+    tableScroll.append(table);
+    replace(mount, tableScroll);
+  }
+
+  function renderProfile(profile) {
+    const avatar = element("div", "teacher-avatar", profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join(""));
+    const copy = element("div", "profile-copy");
+    copy.append(element("p", "eyebrow", profile.role === "class_teacher" ? "Class teacher" : "Subject teacher"), element("h2", "profile-name", profile.name));
+    if (profile.email) {
+      const email = element("a", "profile-email", profile.email);
+      email.href = `mailto:${profile.email}`;
+      copy.append(email);
     }
-    mount.innerHTML = tasks.map((t) => {
-      const due = t.due_date ? `Due ${esc(t.due_date)}` : "No due date";
-      const subj = t.related_subject ? ` · ${esc(t.related_subject)}` : "";
-      const action = t.status !== "done"
-        ? `<button type="button" class="secondary" data-complete="${esc(t.id)}">Mark done</button>`
-        : "";
-      return `<div class="list-item task-item">
-        <div>
-          <strong>${esc(t.title)}</strong>
-          <div class="meta">${due}${subj}</div>
-        </div>
-        <div class="task-actions">${chip(t.status)}${action}</div>
-      </div>`;
-    }).join("");
+    const facts = element("div", "profile-facts");
+    const subjects = [...new Set((profile.subjects || []).map((item) => item.subject))];
+    const classes = [...new Set((profile.subjects || []).map((item) => `${item.grade}${item.section ? `-${item.section}` : ""}`))];
+    facts.append(
+      element("span", "profile-fact", subjects.length ? subjects.join(", ") : "No subjects assigned"),
+      element("span", "profile-fact", classes.length ? `Teaching grades ${classes.join(", ")}` : "No teaching grades"),
+      element("span", "profile-fact", profile.class_teacher_of?.length ? `Class teacher · ${profile.class_teacher_of.join(", ")}` : "Subject teacher")
+    );
+    replace(byId("profile"), avatar, copy, facts);
   }
 
-  function renderSyllabus(rows) {
-    const mount = document.getElementById("syllabus");
-    if (!rows.length) {
-      mount.innerHTML = '<div class="empty-state">No syllabus rows for your subjects.</div>';
-      return;
-    }
-    mount.innerHTML = rows.map((r) => `
-      <div class="list-item">
-        <strong>${esc(r.chapter)}</strong>
-        ${chip(r.status)}
-        <div class="meta">${esc(r.subject)} · grade ${esc(r.grade)}</div>
-      </div>
-    `).join("");
+  function setStudentFilters() {
+    fillFilter(byId("gradeFilter"), new Set(state.students.map((student) => String(student.grade))), "All grades");
+    fillFilter(byId("sectionFilter"), new Set(state.students.map((student) => String(student.section || ""))), "All sections");
   }
 
-  function renderStudents(students) {
-    const mount = document.getElementById("students");
-    if (!students.length) {
-      mount.innerHTML = '<div class="empty-state">No students assigned yet.</div>';
-      return;
-    }
-    mount.innerHTML = students.map((s) => {
-      const attend = s.present_today === true ? "present today" : s.present_today === false ? "absent today" : "";
-      return `<div class="list-item">
-        <strong>${esc(s.name)}</strong>
-        <div class="meta">${esc(s.id)} · grade ${esc(s.grade)}${s.section ? esc(s.section) : ""} · ${esc(s.age_tier)}${attend ? " · " + attend : ""}</div>
-      </div>`;
-    }).join("");
-  }
-
-  async function loadTasks() {
-    const tasks = await SchoolAPI.teacherTasks();
-    renderTasks(tasks);
-  }
-
-  async function loadAll() {
-    err.hidden = true;
-    const [me, timetable, tasks, syllabus, students] = await Promise.all([
-      SchoolAPI.teacherMe(),
-      SchoolAPI.teacherTimetable(),
-      SchoolAPI.teacherTasks(),
-      SchoolAPI.teacherSyllabus(),
-      SchoolAPI.teacherStudents(),
-    ]);
-    document.getElementById("teacherLead").textContent =
-      `${me.name} · ${me.role.replace("_", " ")} · ${(me.subjects || []).map((s) => s.subject).join(", ") || "no subjects"}`;
-    slots = timetable;
-    renderTimetable();
-    renderTasks(tasks);
-    renderSyllabus(syllabus);
-    renderStudents(students);
-  }
-
-  document.getElementById("viewToday").addEventListener("click", () => {
-    weekView = false;
-    document.getElementById("viewToday").classList.remove("secondary");
-    document.getElementById("viewWeek").classList.add("secondary");
-    renderTimetable();
-  });
-  document.getElementById("viewWeek").addEventListener("click", () => {
-    weekView = true;
-    document.getElementById("viewWeek").classList.remove("secondary");
-    document.getElementById("viewToday").classList.add("secondary");
-    renderTimetable();
-  });
-
-  document.getElementById("tasks").addEventListener("click", async (event) => {
-    const btn = event.target.closest("[data-complete]");
-    if (!btn) return;
-    btn.disabled = true;
+  async function loadWorkspace() {
+    const requestId = ++state.requestId;
+    byId("pageError").hidden = true;
+    setLoading(true);
     try {
-      await SchoolAPI.completeTeacherTask(btn.getAttribute("data-complete"));
-      await loadTasks();
-    } catch (e) {
-      showError(e.message);
+      const id = teacherSelect.value;
+      const [profile, slots, tasks, syllabus, students] = await Promise.all([
+        SchoolAPI.teacherMe(id),
+        SchoolAPI.teacherTimetable(id),
+        SchoolAPI.teacherTasks(id),
+        SchoolAPI.teacherSyllabus(id),
+        SchoolAPI.teacherStudents(id),
+      ]);
+      if (requestId !== state.requestId) return;
+      Object.assign(state, { slots, tasks, syllabus, students });
+      renderProfile(profile);
+      setStudentFilters();
+      renderTimetable();
+      renderTasks();
+      renderSyllabus();
+      renderStudents();
+      setLoading(false);
+    } catch (error) {
+      if (requestId !== state.requestId) return;
+      setLoading(false);
+      showError(error);
     }
-  });
+  }
 
-  loadAll().catch((e) => showError(e.message));
+  async function completeTask(taskId, checkbox) {
+    const task = state.tasks.find((item) => String(item.id) === taskId);
+    if (!task || task.status === "done") return;
+    const previous = task.status;
+    const selectedTeacher = teacherSelect.value;
+    task.status = "done";
+    renderTasks();
+    toast("Task marked done.");
+    try {
+      await SchoolAPI.completeTeacherTask(taskId, selectedTeacher);
+    } catch (error) {
+      task.status = previous;
+      renderTasks();
+      toast(`Could not save task. ${error.message}`, "error");
+      const restored = [...byId("tasks").querySelectorAll("[data-task-id]")]
+        .find((input) => input.dataset.taskId === taskId);
+      restored?.focus();
+      return;
+    }
+    try {
+      const refreshed = await SchoolAPI.teacherTasks(selectedTeacher);
+      if (teacherSelect.value === selectedTeacher) {
+        state.tasks = refreshed;
+        renderTasks();
+      }
+    } catch (error) {
+      toast("Task saved, but the list could not be refreshed.", "error");
+    }
+  }
+
+  byId("tasks").addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-task-id]");
+    if (checkbox?.checked) completeTask(checkbox.dataset.taskId, checkbox);
+  });
+  controls.forEach((control) => control.addEventListener(control.type === "search" ? "input" : "change", renderStudents));
+  teacherSelect.addEventListener("change", loadWorkspace);
+  byId("retryPage").addEventListener("click", loadWorkspace);
+
+  Promise.all([SchoolAPI.listTeachers(), SchoolAPI.teacherMe()])
+    .then(([teachers, defaultTeacher]) => {
+      const options = teachers.map((teacher) => {
+        const option = element("option", "", teacher.name);
+        option.value = String(teacher.id);
+        return option;
+      });
+      replace(teacherSelect, ...options);
+      teacherSelect.value = String(defaultTeacher.id);
+      return loadWorkspace();
+    })
+    .catch((error) => {
+      setLoading(false);
+      showError(error);
+    });
 })();
 </script>
 </body>

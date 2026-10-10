@@ -4,6 +4,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage
 
 from app.config import settings
+from app.agents.language import language_name
 from app.agents.state import AgentState
 from app.agents.tools import DAILY_UPDATE_TOOLS
 from app.agents.tool_loop import run_tool_loop
@@ -34,7 +35,7 @@ attendance note."""
 
 def daily_update_node(state: AgentState) -> dict:
     prompt = SYSTEM_PROMPT.format(
-        language=state.get("language", "en"),
+        language=language_name(state.get("language")),
         student_id=state.get("student_id") or "unknown",
         today=date.today().isoformat(),
     )

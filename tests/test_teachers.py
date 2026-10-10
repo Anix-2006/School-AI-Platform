@@ -1,76 +1,82 @@
-"""Teacher workspace APIs. Run with: pytest tests/test_teachers.py"""
-
-import os
-from pathlib import Path
-
-os.environ.setdefault("OPENAI_API_KEY", "test-key")
-os.environ.setdefault("DATABASE_URL", "sqlite:///./dev.db")
-
-import pytest
-from fastapi.testclient import TestClient
-
-from app.services.excel_teacher_store import DEFAULT_TEACHER_ID, write_demo_workbook
+"""Teacher workspace APIs read the workbook (temp copy)."""
 
 
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    xlsx = tmp_path / "teacher_workspace.xlsx"
-    write_demo_workbook(xlsx)
-    monkeypatch.setattr("app.services.excel_teacher_store.settings.teacher_excel_path", str(xlsx))
-    from app.main import app
-
-    with TestClient(app) as c:
-        yield c
+def as_teacher(teacher_id):
+    return {"X-Teacher-Id": teacher_id}
 
 
-def _auth_headers(client):
-    token = client.get("/auth/demo-token").json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+def test_list_teachers(client, store):
+    res = client.get("/teachers")
+    assert res.status_code == 200
+    assert {t["id"] for t in res.json()} == {t["id"] for t in store.teachers(store.default_tenant_id())}
 
 
-def test_teacher_me_and_workspace_lists(client):
-    headers = _auth_headers(client)
-    me = client.get("/teachers/me", headers=headers)
-    assert me.status_code == 200
-    body = me.json()
-    assert body["id"] == DEFAULT_TEACHER_ID
-    assert body["name"]
-    assert body["subjects"]
-
-    timetable = client.get("/teachers/me/timetable", headers=headers)
-    assert timetable.status_code == 200
-    assert len(timetable.json()) >= 1
-    assert "day_name" in timetable.json()[0]
-
-    tasks = client.get("/teachers/me/tasks", headers=headers)
-    assert tasks.status_code == 200
-    assert len(tasks.json()) >= 1
-
-    syllabus = client.get("/teachers/me/syllabus", headers=headers)
-    assert syllabus.status_code == 200
-    assert any(row["chapter"] for row in syllabus.json())
-
-    students = client.get("/teachers/me/students", headers=headers)
-    assert students.status_code == 200
-    names = {s["name"] for s in students.json()}
-    assert "Ananya" in names
-    assert "age_tier" in students.json()[0]
+def test_default_teacher_is_first_in_workbook(client):
+    me = client.get("/teachers/me").json()
+    assert me["id"] == "t-1"
+    assert me["name"] == "Kavita Nair"
+    assert me["role"] == "class_teacher"
+    assert me["class_teacher_of"] == ["3-A"]
+    assert {(s["subject"], s["grade"]) for s in me["subjects"]} == {("Mathematics", "3"), ("Mathematics", "5")}
 
 
-def test_mark_task_complete(client):
-    headers = _auth_headers(client)
-    patched = client.patch(
-        "/teachers/me/tasks/tk1",
-        headers=headers,
-        json={"status": "done"},
-    )
-    assert patched.status_code == 200
-    assert patched.json()["status"] == "done"
+def test_workspace_lists(client):
+    timetable = client.get("/teachers/me/timetable").json()
+    assert timetable
+    assert timetable[0]["day_name"] == "Monday"
+    assert all(slot["subject"] == "Mathematics" for slot in timetable)
+
+    tasks = client.get("/teachers/me/tasks").json()
+    assert [t["status"] for t in tasks][0] == "todo"
+    assert {t["id"] for t in tasks} >= {"task-01", "task-04"}
+
+    syllabus = client.get("/teachers/me/syllabus").json()
+    assert syllabus and all(r["subject"] == "Mathematics" for r in syllabus)
+    assert {r["grade"] for r in syllabus} <= {"3", "5"}
+
+    students = client.get("/teachers/me/students").json()
+    assert {s["name"] for s in students} == {"Ananya", "Rohan"}
+
+
+def test_other_teacher_via_header(client):
+    me = client.get("/teachers/me", headers=as_teacher("t-6")).json()
+    assert me["name"] == "Rajesh Gupta"
+    assert me["class_teacher_of"] == ["5-B"]
+    students = client.get("/teachers/me/students", headers=as_teacher("t-6")).json()
+    assert {s["name"] for s in students} == {"Ananya", "Rohan"}
+
+
+def test_mark_task_done_writes_to_workbook(client, store):
+    res = client.patch("/teachers/me/tasks/task-01", json={"status": "done"})
+    assert res.status_code == 200
+    assert res.json()["status"] == "done"
+    assert store.get("teacher_tasks", "task-01")["status"] == "done"
+
+
+def test_cannot_update_another_teachers_task(client):
+    res = client.patch("/teachers/me/tasks/task-05", json={"status": "done"})
+    assert res.status_code == 404
+
+
+def test_invalid_task_status_is_422(client):
+    res = client.patch("/teachers/me/tasks/task-01", json={"status": "maybe"})
+    assert res.status_code == 422
+
+
+def test_locked_workbook_is_503(client, monkeypatch):
+    from app.services import excel_store
+
+    def locked(*_args, **_kwargs):
+        raise PermissionError("open in Excel")
+
+    monkeypatch.setattr(excel_store.os, "replace", locked)
+    res = client.patch("/teachers/me/tasks/task-01", json={"status": "done"})
+    assert res.status_code == 503
+    assert "close it in Excel" in res.json()["detail"]
 
 
 def test_unknown_teacher_is_404(client):
-    headers = _auth_headers(client)
-    res = client.get("/teachers/me", headers={**headers, "X-Teacher-Id": "no-such-teacher"})
+    res = client.get("/teachers/me", headers=as_teacher("no-such-teacher"))
     assert res.status_code == 404
 
 

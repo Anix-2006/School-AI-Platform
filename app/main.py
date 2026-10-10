@@ -3,19 +3,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from app.database import Base, SessionLocal, engine
+import logging
+
 from app.api import routes_chat, routes_students, routes_webhooks, routes_ops, routes_teachers
 from app.core.security import create_access_token
-from app.config import settings
+from app.services.excel_store import get_store
 
-# Import models so metadata is fully registered before create_all.
-from app.models import tenant, student, academic, conversation, teacher  # noqa: F401
-from app.models.tenant import Tenant
-from app.services.excel_teacher_store import ensure_workbook
-
-# Dev convenience only - use Alembic migrations in production instead of
-# create_all so schema changes are tracked and reversible.
-Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
 
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 FLOW_PAGES = {
@@ -40,15 +34,10 @@ app.include_router(routes_teachers.router)
 
 
 @app.on_event("startup")
-def seed_demo_tenant():
-    db = SessionLocal()
-    try:
-        if not db.get(Tenant, settings.default_tenant_id):
-            db.add(Tenant(id=settings.default_tenant_id, name="Demo School"))
-            db.commit()
-        ensure_workbook()
-    finally:
-        db.close()
+def check_workbook():
+    """Fail fast if the workbook is missing or has no school in it."""
+    store = get_store()
+    logger.info("Using %s (school: %s)", store.path, store.default_tenant_id())
 
 
 @app.get("/")
@@ -91,10 +80,15 @@ def ui_flow_page(page: str):
 @app.get("/auth/demo-token")
 def demo_token():
     """Local-dev helper so the HTML UI can call authenticated routes."""
+    store = get_store()
+    tenant_id = store.default_tenant_id()
+    tenant = store.get("tenants", tenant_id) or {}
     return {
-        "access_token": create_access_token({"tenant_id": settings.default_tenant_id}),
+        "access_token": create_access_token({"tenant_id": tenant_id}),
         "token_type": "bearer",
-        "tenant_id": settings.default_tenant_id,
+        "tenant_id": tenant_id,
+        "school_name": tenant.get("name"),
+        "whatsapp_phone_number_id": tenant.get("whatsapp_phone_number_id"),
     }
 
 
