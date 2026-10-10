@@ -62,6 +62,34 @@ def test_session_id_gives_a_separate_memory_thread(client, graph):
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:abc"
 
 
+def test_shared_message_handler_reuses_chat_thread_for_other_channels(graph, store):
+    result = chat_service.handle_parent_message(
+        store.default_tenant_id(),
+        PRIYA,
+        "Voice question",
+        session_id="call-1",
+        channel="voice",
+    )
+
+    assert result["student_id"] == "s-3-1"
+    assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:call-1"
+    conversations = store.find("conversations", guardian_id=PRIYA)
+    assert conversations[0]["channel"] == "voice"
+
+
+def test_shared_message_handler_preserves_access_errors(graph, store):
+    with pytest.raises(chat_service.ChatAccessError) as exc_info:
+        chat_service.handle_parent_message(
+            store.default_tenant_id(),
+            "g-nobody",
+            "hi",
+            channel="voice",
+        )
+
+    assert exc_info.value.status_code == 404
+    assert graph.calls == []
+
+
 def test_turn_is_saved_to_conversations_and_messages(client, graph, store):
     client.post("/chat", json={"guardian_id": PRIYA, "message": "First question"})
     client.post("/chat", json={"guardian_id": PRIYA, "message": "Second question"})

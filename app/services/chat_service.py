@@ -39,6 +39,21 @@ def resolve_parent(tenant_id: str, guardian_id: str, student_id: str | None = No
     return guardian, student
 
 
+def handle_parent_message(
+    tenant_id: str,
+    guardian_id: str,
+    message: str,
+    *,
+    student_id: str | None = None,
+    session_id: str | None = None,
+    channel: str,
+) -> dict:
+    """Resolve a parent and run one message through the orchestrator."""
+    guardian, student = resolve_parent(tenant_id, guardian_id, student_id)
+    thread_id = f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
+    return run_parent_turn(tenant_id, guardian, student, message, channel, thread_id)
+
+
 def run_parent_turn(
     tenant_id: str,
     guardian: dict,
