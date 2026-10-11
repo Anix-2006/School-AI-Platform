@@ -4444,3 +4444,221 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   .bubble { max-width: 88%; }
   .chat-intro { padding: 15px 16px; }
 }
+
+/* Next UI — Vaani voice assistant */
+.voice-mode-page {
+  width: min(100%, 50rem);
+  padding: 18px 14px calc(112px + env(safe-area-inset-bottom));
+}
+.voice-mode-panel {
+  gap: 16px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(45, 212, 255, 0.12), transparent 22rem),
+    linear-gradient(150deg, rgba(14, 55, 111, 0.92), rgba(5, 22, 51, 0.96));
+  border-color: var(--border);
+  border-radius: 26px;
+  box-shadow: var(--shadow-md);
+}
+.voice-mode-heading {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+}
+.voice-mode-heading > div { min-width: 0; }
+.voice-mode-heading h1 {
+  overflow: hidden;
+  margin: 0;
+  font-size: clamp(1.42rem, 5.5vw, 2.15rem);
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-mode-heading .eyebrow {
+  overflow: hidden;
+  color: var(--accent-2);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voice-back {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border);
+}
+.voice-back:hover { color: #061a3a; background: var(--accent); border-color: var(--accent); }
+.voice-language-chip {
+  color: #061a3a;
+  background: linear-gradient(135deg, var(--accent), #ffe28a);
+  box-shadow: 0 6px 16px rgba(255, 194, 46, 0.18);
+}
+.voice-stage {
+  --mouth-scale: 1;
+  min-height: clamp(19rem, 52vh, 27rem);
+  padding: 22px 14px;
+  background:
+    radial-gradient(circle at center, rgba(45, 212, 255, 0.16), transparent 54%),
+    rgba(3, 18, 43, 0.48);
+  border: 1px solid rgba(45, 212, 255, 0.13);
+  border-radius: 24px;
+}
+.voice-stage strong {
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.25rem;
+}
+.voice-stage p { color: var(--text-muted); }
+.vaani-mascot {
+  width: min(230px, 72vw);
+  max-height: 230px;
+  filter: drop-shadow(0 20px 30px rgba(0, 8, 28, 0.38));
+}
+.vaani-body { fill: #0b4a9e; stroke: var(--accent-2); stroke-width: 5; }
+.vaani-face { fill: #dff8ff; }
+.vaani-eyes ellipse { fill: #fff; stroke: #061a3a; }
+.vaani-eyes circle { fill: #061a3a; }
+.vaani-brow, .vaani-mouth, .vaani-headset > path {
+  stroke: #061a3a;
+}
+.vaani-headset rect { fill: var(--accent); stroke: #061a3a; }
+.vaani-headset circle { fill: var(--accent-2); stroke: #061a3a; }
+.vaani-antenna path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.vaani-antenna circle {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 7px rgba(255, 194, 46, 0.9));
+}
+.vaani-arms path {
+  fill: none;
+  stroke: var(--accent-2);
+  stroke-width: 13;
+  stroke-linecap: round;
+}
+.vaani-arms circle { fill: var(--accent); stroke: #061a3a; stroke-width: 3; }
+.vaani-pocket path:first-child {
+  fill: rgba(45, 212, 255, 0.18);
+  stroke: var(--accent-2);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.vaani-pocket path:last-child {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.vaani-ring circle { stroke: var(--accent-2); }
+.vaani-dots circle { fill: var(--accent); }
+.vaani-name { color: var(--accent-2); font-family: inherit; }
+.voice-stage[data-state="waving"] .vaani-arm-right {
+  transform-box: fill-box;
+  transform-origin: left bottom;
+  animation: vaani-wave 650ms ease-in-out 4 alternate;
+}
+.voice-stage[data-state="listening"] .vaani-antenna circle {
+  animation: vaani-antenna-glow 800ms ease-in-out infinite alternate;
+}
+.voice-stage[data-state="listening"] .vaani-eyes ellipse { transform: scaleY(1.1); }
+.voice-stage[data-state="thinking"] .vaani-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: vaani-look 1.2s ease-in-out infinite alternate;
+}
+.voice-stage[data-state="speaking"] .vaani-antenna circle {
+  transform: scale(var(--mouth-scale));
+  transform-origin: center;
+}
+.voice-stage[data-state="error"] .vaani-float { transform: rotate(-7deg); }
+@keyframes vaani-wave {
+  to { transform: rotate(-22deg) translateY(-4px); }
+}
+@keyframes vaani-antenna-glow {
+  to { transform: scale(1.28); filter: drop-shadow(0 0 14px var(--accent)); }
+}
+@keyframes vaani-look {
+  to { transform: translateX(4px); }
+}
+
+.voice-energy-wrap {
+  display: grid;
+  width: min(230px, 78%);
+  gap: 5px;
+}
+.voice-energy-wrap > span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.voice-energy {
+  width: 100%;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(171, 211, 255, 0.13);
+}
+.voice-energy span {
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  box-shadow: 0 0 10px rgba(45, 212, 255, 0.4);
+}
+.voice-start {
+  width: 100%;
+  min-height: 54px;
+  color: #061a3a;
+  background: linear-gradient(135deg, var(--accent), #ffe18a);
+  border-color: var(--accent);
+  font-weight: 900;
+}
+.voice-mode-controls { gap: 8px; }
+.voice-control {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--border);
+}
+.voice-control:hover, .voice-control[aria-pressed="true"] {
+  color: #061a3a;
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.voice-captions > div {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--border);
+}
+.voice-captions span { color: var(--accent-2); }
+.voice-privacy-copy { color: var(--text-muted); }
+
+@media (min-width: 1024px) {
+  body > main.voice-mode-page {
+    width: min(
+      calc(100vw - (2 * var(--next-gutter)) - var(--desktop-sidebar-width)),
+      50rem
+    ) !important;
+    max-width: 50rem !important;
+    min-height: calc(100dvh - 114px);
+    margin-left: calc(
+      var(--next-gutter) + var(--desktop-sidebar-width) +
+      max(
+        0px,
+        calc(50vw - var(--next-gutter) - 32.5rem)
+      )
+    ) !important;
+    padding: 28px;
+    border-radius: 0 0 28px 0;
+  }
+  .voice-mode-panel { padding: 28px; }
+}
+
+@media (max-width: 420px) {
+  .voice-mode-page { padding-inline: 10px; }
+  .voice-mode-panel { padding: 14px; border-radius: 22px; }
+  .voice-mode-heading { grid-template-columns: 42px minmax(0, 1fr) auto; gap: 8px; }
+  .voice-mode-heading h1 { font-size: 1.35rem; }
+  .voice-mode-heading .eyebrow { font-size: 0.65rem; }
+  .voice-language-chip { padding-inline: 8px; font-size: 0.8rem; }
+  .voice-stage { min-height: 18rem; }
+  .vaani-mascot { width: min(200px, 68vw); }
+}
