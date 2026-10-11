@@ -221,7 +221,56 @@
       if (destination) window.location.assign(destination);
     });
     metadata.append(school, roleLabel, roleSelect);
-    topbar.append(desktopTitle, metadata);
+
+    const actions = document.createElement("div");
+    actions.className = "topbar-actions";
+    const searchWrap = document.createElement("label");
+    searchWrap.className = "topbar-search";
+    const searchText = document.createElement("span");
+    searchText.className = "sr-only";
+    searchText.textContent = "Filter navigation";
+    const searchIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    searchIcon.setAttribute("viewBox", "0 0 24 24");
+    searchIcon.setAttribute("aria-hidden", "true");
+    const searchPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    searchPath.setAttribute("d", "m21 21-4.5-4.5M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z");
+    searchIcon.appendChild(searchPath);
+    const search = document.createElement("input");
+    search.type = "search";
+    search.placeholder = "Find a page";
+    search.setAttribute("aria-label", "Filter navigation");
+    search.addEventListener("input", () => {
+      const query = search.value.trim().toLocaleLowerCase();
+      document.querySelectorAll("#app-nav nav a").forEach((link) => {
+        link.hidden = Boolean(query) && !link.textContent.toLocaleLowerCase().includes(query);
+      });
+    });
+    searchWrap.append(searchText, searchIcon, search);
+
+    const notifications = document.createElement("button");
+    notifications.type = "button";
+    notifications.className = "topbar-icon";
+    notifications.setAttribute("aria-label", "Notifications");
+    const bell = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    bell.setAttribute("viewBox", "0 0 24 24");
+    bell.setAttribute("aria-hidden", "true");
+    const bellPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    bellPath.setAttribute("d", "M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4");
+    bell.appendChild(bellPath);
+    notifications.appendChild(bell);
+    notifications.addEventListener("click", () => {
+      showStatus("No new notifications.", null);
+      window.setTimeout(() => {
+        if (navigator.onLine) status.hidden = true;
+      }, 2500);
+    });
+
+    const avatar = document.createElement("span");
+    avatar.className = "topbar-avatar";
+    avatar.setAttribute("aria-label", `${roleText} profile`);
+    avatar.textContent = roleText.slice(0, 2).toUpperCase();
+    actions.append(searchWrap, notifications, avatar);
+    topbar.append(desktopTitle, actions, metadata);
 
     const loadedSchool = document.getElementById("schoolName");
     if (loadedSchool) {
