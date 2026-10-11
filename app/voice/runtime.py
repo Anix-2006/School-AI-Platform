@@ -32,7 +32,7 @@ class VoiceRuntime:
                     device=settings.whisper_device,
                     compute_type=settings.whisper_compute_type,
                 )
-                await asyncio.to_thread(stt.load)
+                await asyncio.to_thread(stt.warmup)
                 tts = GttsEngine(
                     timeout=settings.voice_tts_timeout,
                     cache_size=settings.tts_cache_size,

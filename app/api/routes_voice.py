@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -31,6 +32,17 @@ class VoiceTimings(BaseModel):
     queue: int | None = None
 
 
+class DetailedVoiceTimings(BaseModel):
+    upload: int
+    decode: int
+    queue: int
+    stt: int
+    router: int
+    agent_llm: int
+    tts: int
+    total: int
+
+
 class VoiceChatResponse(BaseModel):
     transcript: str
     reply: str
@@ -38,6 +50,7 @@ class VoiceChatResponse(BaseModel):
     language: Language
     audio_id: str | None
     timings: VoiceTimings
+    timings_ms: DetailedVoiceTimings
 
 
 VOICE_CHAT_REQUEST_BODY = {
@@ -105,8 +118,10 @@ async def voice_chat(
     request: Request,
     tenant_id: str = Depends(get_current_tenant),
 ):
+    request_started = time.perf_counter()
     service = _service(request)
     fields, audio_bytes, content_type = await _read_voice_multipart(request)
+    uploaded = time.perf_counter()
     guardian_id = fields.get("guardian_id", "").strip()
     student_id = fields.get("student_id", "").strip()
     language = fields.get("language") or None
@@ -128,6 +143,7 @@ async def voice_chat(
             max_bytes=settings.voice_max_bytes,
             max_seconds=settings.voice_max_seconds,
         )
+        decoded = time.perf_counter()
         return await service.chat(
             tenant_id=tenant_id,
             guardian=guardian,
@@ -136,6 +152,8 @@ async def voice_chat(
             content_type=content_type,
             language=language,
             session_id=session_id,
+            upload_ms=round((uploaded - request_started) * 1000),
+            decode_ms=round((decoded - uploaded) * 1000),
         )
     except (AudioValidationError, VoiceError) as exc:
         raise HTTPException(exc.status_code, exc.detail) from None

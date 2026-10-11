@@ -19,3 +19,5 @@ class AgentState(TypedDict):
     route_to: Optional[str]  # which specialist agent handles this turn
     intent_source: Optional[str]        # "classifier" or "llm"
     intent_confidence: Optional[float]  # classifier probability; None for llm
+    router_ms: Optional[int]
+    agent_llm_ms: Optional[int]

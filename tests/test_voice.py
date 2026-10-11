@@ -309,8 +309,12 @@ def test_voice_api_auth_access_history_response_and_download(
         "language",
         "audio_id",
         "timings",
+            "timings_ms",
     }
     assert set(body["timings"]) == {"queue", "stt", "llm", "tts", "total"}
+    assert set(body["timings_ms"]) == {
+        "upload", "decode", "queue", "stt", "router", "agent_llm", "tts", "total"
+    }
     assert graph.calls[0]["state"]["channel"] == "voice"
     conversation = next(
         item

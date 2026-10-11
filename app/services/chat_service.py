@@ -77,6 +77,8 @@ def run_parent_turn(
         "channel": "voice" if channel == "voice" else "chat",
         "intent": None,
         "route_to": None,
+        "router_ms": None,
+        "agent_llm_ms": None,
     }
     result = orchestrator_graph.invoke(state, config={"configurable": {"thread_id": thread_id}})
     reply = extract_text_reply(result["messages"])
@@ -87,6 +89,8 @@ def run_parent_turn(
         "agent_used": agent,
         "intent_source": result.get("intent_source"),
         "intent_confidence": result.get("intent_confidence"),
+        "router_ms": result.get("router_ms", 0),
+        "agent_llm_ms": result.get("agent_llm_ms", 0),
         "student_id": student["id"],
         "language": language,
     }

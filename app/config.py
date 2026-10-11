@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     default_teacher_id: str = ""
 
     voice_enabled: bool = False
-    whisper_model: str = "base"
+    whisper_model: str = "tiny"
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
     voice_max_concurrency: int = 1
@@ -38,8 +38,10 @@ class Settings(BaseSettings):
     voice_guardian_rate: int = 10
     voice_global_rate: int = 60
     voice_speak_rate: int = 20
-    voice_tts_timeout: float = 12.0
+    voice_tts_timeout: float = 4.0
     voice_audio_ttl: float = 300.0
+    voice_vad_silence_ms: int = 800
+    voice_idle_prompt_seconds: int = 20
 
 
 settings = Settings()
