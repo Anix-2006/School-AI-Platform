@@ -57,9 +57,6 @@ class GttsEngine:
     def close(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
-    def close(self) -> None:
-        self._executor.shutdown(wait=False, cancel_futures=True)
-
     @staticmethod
     def _render(text: str, language: str) -> bytes:
         from gtts import gTTS
