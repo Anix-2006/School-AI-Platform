@@ -50,7 +50,7 @@
         return `${field ? `${field}: ` : ""}${issue.msg || "invalid value"}`;
       }).join("; ");
     }
-    if (status === 400 || status === 422) {
+    if (status === 400 || status === 413 || status === 415 || status === 422) {
       return detail || "Please check the information and try again.";
     }
     if (status === 401) return "Your session expired. Please try again.";
@@ -103,6 +103,7 @@
       timeout = DEFAULT_TIMEOUT,
       retry = false,
       responseType = "json",
+      announceErrors = true,
       headers: optionHeaders = {},
       ...fetchOptions
     } = options;
@@ -163,7 +164,9 @@
       const safeRetry = retry || !fetchOptions.method || fetchOptions.method === "GET";
       const wrapped = new Error(message);
       wrapped.status = error.status || 0;
-      announce("error", message, safeRetry ? () => request(path, options) : null);
+      if (announceErrors) {
+        announce("error", message, safeRetry ? () => request(path, options) : null);
+      }
       throw wrapped;
     } finally {
       window.clearTimeout(timer);
@@ -530,7 +533,11 @@
     },
     async voiceStatus() {
       await ensureAuth();
-      return request("/voice/status", { auth: true, timeout: 20000 });
+      return request("/voice/status", {
+        auth: true,
+        timeout: 20000,
+        announceErrors: false,
+      });
     },
     async voiceChat(formData) {
       await ensureAuth();
@@ -539,6 +546,7 @@
         body: formData,
         auth: true,
         timeout: 90000,
+        announceErrors: false,
       });
     },
     async voiceAudio(audioId, guardianId) {
@@ -549,6 +557,7 @@
         auth: true,
         responseType: "blob",
         timeout: 30000,
+        announceErrors: false,
       });
     },
     async voiceSpeak(text, language) {
@@ -559,6 +568,7 @@
         auth: true,
         responseType: "blob",
         timeout: 90000,
+        announceErrors: false,
       });
     },
     async sendWhatsAppWebhook(fromNumber, text) {
