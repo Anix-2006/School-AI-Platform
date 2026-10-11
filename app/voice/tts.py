@@ -14,7 +14,7 @@ class TtsEngine(Protocol):
 
 
 class GttsEngine:
-    SUPPORTED_LANGUAGES = {"en", "hi", "te"}
+    SUPPORTED_LANGUAGES = {"en", "hi"}
 
     def __init__(self, *, timeout: float = 12.0, cache_size: int = 128, workers: int = 4):
         self.timeout = timeout

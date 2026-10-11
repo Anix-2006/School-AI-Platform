@@ -87,7 +87,7 @@ class VoiceService:
     ) -> dict:
         self.check_rate("chat", guardian["id"])
         started = time.perf_counter()
-        chosen_language = _voice_language(language, guardian)
+        fallback_language = _voice_language(language, guardian)
         try:
             await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
         except TimeoutError:
@@ -96,9 +96,10 @@ class VoiceService:
         try:
             prompt = _initial_prompt(student)
             transcript = await asyncio.to_thread(
-                self.stt.transcribe, audio, content_type, chosen_language, prompt
+                self.stt.transcribe, audio, content_type, None, prompt
             )
             transcribed = time.perf_counter()
+            reply_language = choose_reply_language(transcript)
             if (
                 transcript.duration is not None
                 and transcript.duration > self.max_seconds
@@ -107,7 +108,7 @@ class VoiceService:
             if _is_unusable_transcript(transcript):
                 return await self._friendly_retry(
                     transcript,
-                    chosen_language,
+                    reply_language if transcript.text.strip() else fallback_language,
                     tenant_id,
                     guardian["id"],
                     student["id"],
@@ -128,12 +129,12 @@ class VoiceService:
                 transcript.text,
                 "voice",
                 thread_id,
-                chosen_language,
+                reply_language,
             )
             replied = time.perf_counter()
-            spoken_text = clean_for_speech(result["reply"], chosen_language)
+            spoken_text = clean_for_speech(result["reply"], reply_language)
             try:
-                speech = await self.tts.synthesize(spoken_text, chosen_language)
+                speech = await self.tts.synthesize(spoken_text, reply_language)
             except Exception:
                 speech = b""
             finished = time.perf_counter()
@@ -160,11 +161,12 @@ class VoiceService:
                 "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
                 guardian["id"],
                 session_id or "default",
-                chosen_language,
+                reply_language,
                 timings_ms,
             )
             return {
                 **result,
+                "language": reply_language,
                 "transcript": transcript.text,
                 "spoken_text": spoken_text,
                 "audio_id": audio_id,
@@ -257,7 +259,6 @@ class VoiceService:
 _RETRY_REPLIES = {
     "en": "I could not hear a clear question. Please try again.",
     "hi": "मुझे सवाल साफ़ सुनाई नहीं दिया। कृपया फिर से बोलें।",
-    "te": "మీ ప్రశ్న స్పష్టంగా వినిపించలేదు. దయచేసి మళ్లీ చెప్పండి.",
 }
 
 
@@ -271,10 +272,20 @@ def _initial_prompt(student: dict) -> str:
 
 
 def _voice_language(override: str | None, guardian: dict) -> str:
-    if override in {"en", "hi", "te"}:
+    if override in {"en", "hi"}:
         return override
     preferred = guardian.get("preferred_language")
-    return preferred if preferred in {"en", "hi", "te"} else "en"
+    return preferred if preferred in {"en", "hi"} else "en"
+
+
+def choose_reply_language(transcript: Transcript) -> str:
+    """Choose English or Hindi for this turn, independent of profile language."""
+    text = transcript.text.strip()
+    devanagari = len(re.findall(r"[\u0900-\u097f]", text))
+    letters = len(re.findall(r"[^\W\d_]", text, flags=re.UNICODE))
+    if transcript.language == "hi" or (letters and devanagari / letters >= 0.15):
+        return "hi"
+    return "en"
 
 
 def audio_owner_key(tenant_id: str, guardian_id: str) -> str:
@@ -282,6 +293,8 @@ def audio_owner_key(tenant_id: str, guardian_id: str) -> str:
 
 
 def _is_unusable_transcript(transcript: Transcript) -> bool:
+    if len(transcript.text.strip()) < 2:
+        return True
     words = re.findall(r"\w+", transcript.text.casefold())
     if not words or transcript.confidence < 0.15:
         return True

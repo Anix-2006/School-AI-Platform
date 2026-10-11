@@ -73,6 +73,7 @@ def run_parent_turn(
         "student_id": student["id"],
         "guardian_id": guardian["id"],
         "language": language,
+        "reply_language": language if channel == "voice" else None,
         "age_tier": student.get("age_tier"),
         "channel": "voice" if channel == "voice" else "chat",
         "intent": None,
