@@ -31,6 +31,21 @@ are cleared when the browser session ends.
 Use `textContent`, `createElement`, or escaped templates for API-provided data.
 Do not insert untrusted values directly with `innerHTML`.
 
+## Design system
+
+The default theme is navy glass. Shared CSS variables include `--bg-grad`,
+`--surface`, `--surface-strong`, `--border`, `--text`, `--text-muted`,
+`--accent`, `--accent-2`, `--success`, `--warning`, and `--danger`.
+
+Shared styles cover primary, secondary and ghost buttons; inputs and selects;
+chips and badges; cards and KPI tiles; tables; tabs; dialogs; toasts;
+skeletons; empty states; avatars; progress bars; the sidebar; and bottom
+navigation. Motion is 150–250ms and is disabled by `prefers-reduced-motion`.
+
+The UI uses Noto Sans and Noto Sans Devanagari, both released under the SIL
+Open Font License 1.1. Pages load them from Google Fonts with
+`font-display: swap`; system fonts remain the fallback.
+
 ## Responsive shell
 
 - Mobile-first layouts are the default. Small-flow adjustments occur at
@@ -39,8 +54,9 @@ Do not insert untrusted values directly with `innerHTML`.
 - Most parent, teacher, role, and management grids widen from `700px`.
 - Older workspace/helper layouts widen at `800px`, parent chat at `860px`,
   and the teacher dashboard at `900px`.
-- From `1024px`: the fixed `17rem` sidebar and desktop content topbar are
-  persistent. The hamburger, close button, and backdrop are hidden.
+- From `1024px`: the fixed `15rem` sidebar and desktop content topbar are
+  persistent inside the rounded floating shell. The hamburger, close button,
+  bottom navigation, and backdrop are hidden.
 - From `1440px`: shell gutters widen while content stays centred at a maximum
   width of `80rem`.
 
@@ -53,7 +69,7 @@ Voice mode is `/flows/voice-assistant`. One initial tap unlocks microphone and
 audio; after that browser energy detection ends each turn, the reply plays
 automatically, and listening resumes. It supports English and Hindi per turn.
 
-- States: idle, listening, thinking, speaking, stopped, and error.
+- States: idle, waving, listening, thinking, speaking, stopped, and error.
 - Controls: mute, stop/restart, captions, child switcher, and detected-language
   chip.
 - Speaking while playback is active stops Vaani and starts a new turn.
@@ -62,7 +78,8 @@ automatically, and listening resumes. It supports English and Hindi per turn.
 - Mobile uses a four-item bottom bar. At `1024px`, Voice appears in the fixed
   sidebar and the assistant stays centred at a maximum width of `48rem`.
 - Vaani is an original inline-SVG mascot with reduced-motion-safe state
-  animation. Exported 32px and 512px PNGs are in `ui/assets/`.
+  animation. Separate SVG groups animate its eyes, mouth, antenna, arms, and
+  body. Exported 32px and 512px PNGs are in `ui/assets/`.
 
 Recording prefers low-bitrate mono WebM/Opus and uses MP4/AAC on iOS Safari.
 Microphone access works on `http://localhost`; non-local pages require HTTPS
