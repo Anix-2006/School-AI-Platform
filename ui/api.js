@@ -102,11 +102,17 @@
       auth = false,
       timeout = DEFAULT_TIMEOUT,
       retry = false,
+      responseType = "json",
       headers: optionHeaders = {},
       ...fetchOptions
     } = options;
     const headers = { ...optionHeaders };
-    if (fetchOptions.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+    const hasContentType = Object.keys(headers).some(
+      (name) => name.toLowerCase() === "content-type",
+    );
+    if (fetchOptions.body && !(fetchOptions.body instanceof FormData) && !hasContentType) {
+      headers["Content-Type"] = "application/json";
+    }
     if (auth) {
       if (!state.token) await refreshAuth();
       headers.Authorization = `Bearer ${state.token}`;
@@ -124,12 +130,18 @@
         headers,
         signal: controller.signal,
       });
-      const text = await response.text();
+      const payload = response.ok && responseType === "blob"
+        ? await response.blob()
+        : await response.text();
       let data = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        data = text;
+      if (payload instanceof Blob) {
+        data = payload;
+      } else {
+        try {
+          data = payload ? JSON.parse(payload) : null;
+        } catch {
+          data = payload;
+        }
       }
 
       if (response.status === 401 && auth && !alreadyRetried) {
@@ -231,6 +243,34 @@
       agent: "Helper",
       typing: "School helper is typing",
       emptyMessage: "Write a message before sending.",
+      voiceRecord: "Record voice message",
+      voiceStop: "Stop recording",
+      voiceCancel: "Cancel",
+      voiceListening: "Listening…",
+      voiceRecording: "Recording",
+      voiceUploading: "Uploading audio…",
+      voiceTranscribing: "Transcribing…",
+      voiceThinking: "Thinking…",
+      voiceSpeaking: "Audio reply ready.",
+      voiceReady: "Voice message ready.",
+      voiceWarming: "Voice service is warming up. Text chat is still available.",
+      voiceUnavailable: "Voice messages are not available in this browser.",
+      voicePermission: "Microphone permission was denied. Allow access and try again.",
+      voiceNoDevice: "No microphone was found.",
+      voiceOffline: "You are offline. Text chat is still available.",
+      voiceBusy: "Voice service is busy. Please wait and try again.",
+      voiceNoConsent: "Consent is required before a voice message can be processed.",
+      voiceUnclear: "We could not understand that audio. Please try again or type your message.",
+      voiceUploadError: "The voice message could not be processed. Please try again.",
+      voiceAudioError: "Audio could not play. The full text reply is shown.",
+      voicePrivacy: "Your voice is processed by AI and is not stored as audio.",
+      voicePrivacyContinue: "Continue",
+      voiceEditTranscript: "Edit transcript",
+      voicePlay: "Play reply",
+      voicePause: "Pause reply",
+      voiceReplay: "Replay",
+      voiceProgress: "Audio progress",
+      voiceSeconds: "seconds",
     }),
     hi: Object.freeze({
       appName: "स्कूल पैरेंट AI",
@@ -286,6 +326,34 @@
       agent: "सहायक",
       typing: "स्कूल सहायक लिख रहा है",
       emptyMessage: "भेजने से पहले संदेश लिखें।",
+      voiceRecord: "वॉइस संदेश रिकॉर्ड करें",
+      voiceStop: "रिकॉर्डिंग रोकें",
+      voiceCancel: "रद्द करें",
+      voiceListening: "सुन रहा है…",
+      voiceRecording: "रिकॉर्डिंग",
+      voiceUploading: "ऑडियो अपलोड हो रहा है…",
+      voiceTranscribing: "आवाज़ को लिख रहा है…",
+      voiceThinking: "सोच रहा है…",
+      voiceSpeaking: "ऑडियो उत्तर तैयार है।",
+      voiceReady: "वॉइस संदेश तैयार है।",
+      voiceWarming: "वॉइस सेवा शुरू हो रही है। टेक्स्ट चैट उपलब्ध है।",
+      voiceUnavailable: "इस ब्राउज़र में वॉइस संदेश उपलब्ध नहीं हैं।",
+      voicePermission: "माइक्रोफ़ोन की अनुमति नहीं मिली। अनुमति देकर फिर कोशिश करें।",
+      voiceNoDevice: "कोई माइक्रोफ़ोन नहीं मिला।",
+      voiceOffline: "आप ऑफ़लाइन हैं। टेक्स्ट चैट उपलब्ध है।",
+      voiceBusy: "वॉइस सेवा व्यस्त है। थोड़ी देर बाद कोशिश करें।",
+      voiceNoConsent: "वॉइस संदेश के लिए सहमति आवश्यक है।",
+      voiceUnclear: "ऑडियो समझ नहीं आया। फिर कोशिश करें या संदेश लिखें।",
+      voiceUploadError: "वॉइस संदेश प्रोसेस नहीं हुआ। फिर कोशिश करें।",
+      voiceAudioError: "ऑडियो नहीं चला। पूरा उत्तर टेक्स्ट में दिखाया गया है।",
+      voicePrivacy: "आपकी आवाज़ AI द्वारा प्रोसेस होती है और ऑडियो के रूप में सहेजी नहीं जाती।",
+      voicePrivacyContinue: "जारी रखें",
+      voiceEditTranscript: "लिखे संदेश को संपादित करें",
+      voicePlay: "उत्तर चलाएँ",
+      voicePause: "उत्तर रोकें",
+      voiceReplay: "फिर चलाएँ",
+      voiceProgress: "ऑडियो प्रगति",
+      voiceSeconds: "सेकंड",
     }),
     te: Object.freeze({
       appName: "స్కూల్ పేరెంట్ AI",
@@ -341,6 +409,34 @@
       agent: "సహాయకుడు",
       typing: "పాఠశాల సహాయకుడు టైప్ చేస్తున్నారు",
       emptyMessage: "పంపే ముందు సందేశం రాయండి.",
+      voiceRecord: "వాయిస్ సందేశాన్ని రికార్డ్ చేయండి",
+      voiceStop: "రికార్డింగ్ ఆపండి",
+      voiceCancel: "రద్దు చేయండి",
+      voiceListening: "వింటోంది…",
+      voiceRecording: "రికార్డింగ్",
+      voiceUploading: "ఆడియో అప్‌లోడ్ అవుతోంది…",
+      voiceTranscribing: "మాటలను రాస్తోంది…",
+      voiceThinking: "ఆలోచిస్తోంది…",
+      voiceSpeaking: "ఆడియో సమాధానం సిద్ధంగా ఉంది.",
+      voiceReady: "వాయిస్ సందేశం సిద్ధంగా ఉంది.",
+      voiceWarming: "వాయిస్ సేవ సిద్ధమవుతోంది. టెక్స్ట్ చాట్ అందుబాటులో ఉంది.",
+      voiceUnavailable: "ఈ బ్రౌజర్‌లో వాయిస్ సందేశాలు అందుబాటులో లేవు.",
+      voicePermission: "మైక్రోఫోన్ అనుమతి నిరాకరించబడింది. అనుమతించి మళ్లీ ప్రయత్నించండి.",
+      voiceNoDevice: "మైక్రోఫోన్ కనుగొనబడలేదు.",
+      voiceOffline: "మీరు ఆఫ్‌లైన్‌లో ఉన్నారు. టెక్స్ట్ చాట్ అందుబాటులో ఉంది.",
+      voiceBusy: "వాయిస్ సేవ బిజీగా ఉంది. కాసేపటి తర్వాత ప్రయత్నించండి.",
+      voiceNoConsent: "వాయిస్ సందేశాన్ని ప్రాసెస్ చేయడానికి సమ్మతి అవసరం.",
+      voiceUnclear: "ఆడియో అర్థం కాలేదు. మళ్లీ ప్రయత్నించండి లేదా సందేశాన్ని టైప్ చేయండి.",
+      voiceUploadError: "వాయిస్ సందేశాన్ని ప్రాసెస్ చేయలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+      voiceAudioError: "ఆడియో ప్లే కాలేదు. పూర్తి సమాధానం టెక్స్ట్‌లో ఉంది.",
+      voicePrivacy: "మీ వాయిస్‌ను AI ప్రాసెస్ చేస్తుంది; ఆడియోగా నిల్వ చేయదు.",
+      voicePrivacyContinue: "కొనసాగించండి",
+      voiceEditTranscript: "వ్రాతను సవరించండి",
+      voicePlay: "సమాధానం ప్లే చేయండి",
+      voicePause: "సమాధానం ఆపండి",
+      voiceReplay: "మళ్లీ ప్లే చేయండి",
+      voiceProgress: "ఆడియో పురోగతి",
+      voiceSeconds: "సెకన్లు",
     }),
   });
 
@@ -430,6 +526,39 @@
         method: "POST",
         body: JSON.stringify(payload),
         auth: true,
+      });
+    },
+    async voiceStatus() {
+      await ensureAuth();
+      return request("/voice/status", { auth: true, timeout: 20000 });
+    },
+    async voiceChat(formData) {
+      await ensureAuth();
+      return request("/voice/chat", {
+        method: "POST",
+        body: formData,
+        auth: true,
+        timeout: 90000,
+      });
+    },
+    async voiceAudio(audioId, guardianId) {
+      await ensureAuth();
+      const id = encodeURIComponent(audioId);
+      const guardian = encodeURIComponent(guardianId);
+      return request(`/voice/audio/${id}?guardian_id=${guardian}`, {
+        auth: true,
+        responseType: "blob",
+        timeout: 30000,
+      });
+    },
+    async voiceSpeak(text, language) {
+      await ensureAuth();
+      return request("/voice/speak", {
+        method: "POST",
+        body: JSON.stringify({ text, language: normalizeLanguage(language) }),
+        auth: true,
+        responseType: "blob",
+        timeout: 90000,
       });
     },
     async sendWhatsAppWebhook(fromNumber, text) {
