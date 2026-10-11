@@ -8,6 +8,7 @@ step. Keep shared assets at `/styles.css`, `/api.js`, `/nav.js`, and
 
 - `/` — role chooser
 - Parent — `/flows/parent-chat`
+- Parent voice assistant — `/flows/voice-assistant`
 - Teacher — `/flows/teacher-workspace`
 - Management — `/flows/platform-overview`
 - Other existing pages remain available from the sidebar under `/flows/...`.
@@ -48,19 +49,24 @@ management and all layouts below `1024px` remain unchanged.
 
 ## Voice controls and states
 
-Voice is on `/flows/parent-chat` when the API reports `ready` and the browser
-supports `MediaRecorder`. The UI includes:
+Voice mode is `/flows/voice-assistant`. One initial tap unlocks microphone and
+audio; after that browser energy detection ends each turn, the reply plays
+automatically, and listening resumes. It supports English and Hindi per turn.
 
-- a microphone/stop button, one-time privacy acknowledgement, recording timer,
-  input level, cancel, and permission/device errors;
-- warming, offline, uploading, transcribing, thinking, busy, unclear-audio,
-  ready, and playback-error states, with text chat available as fallback;
-- an editable transcript and text reply;
-- play/pause, replay, and seek controls for the generated reply.
+- States: idle, listening, thinking, speaking, stopped, and error.
+- Controls: mute, stop/restart, captions, child switcher, and detected-language
+  chip.
+- Speaking while playback is active stops Vaani and starts a new turn.
+- Twenty seconds of silence plays one idle prompt; another twenty seconds
+  releases the microphone.
+- Mobile uses a four-item bottom bar. At `1024px`, Voice appears in the fixed
+  sidebar and the assistant stays centred at a maximum width of `48rem`.
+- Vaani is an original inline-SVG mascot with reduced-motion-safe state
+  animation. Exported 32px and 512px PNGs are in `ui/assets/`.
 
-The browser format preference is WebM/Opus, Ogg/Opus, MP4/AAC, AAC, then MP4.
-Availability differs by browser and OS. Microphone access works on
-`http://localhost`; non-local pages require HTTPS and user permission.
+Recording prefers low-bitrate mono WebM/Opus and uses MP4/AAC on iOS Safari.
+Microphone access works on `http://localhost`; non-local pages require HTTPS
+and permission.
 
 ## Security and data limits
 

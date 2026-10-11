@@ -16,7 +16,7 @@ from app.services.chat_service import ChatAccessError, resolve_parent
 from app.voice.audio import AudioValidationError, validate_audio
 from app.voice.service import VoiceError, audio_owner_key
 
-Language = Literal["en", "hi", "te"]
+Language = Literal["en", "hi"]
 
 
 class SpeakRequest(BaseModel):
@@ -67,7 +67,7 @@ VOICE_CHAT_REQUEST_BODY = {
                         "student_id": {"type": "string"},
                         "language": {
                             "type": "string",
-                            "enum": ["en", "hi", "te"],
+                            "enum": ["en", "hi"],
                         },
                         "session_id": {"type": "string"},
                     },
@@ -128,8 +128,8 @@ async def voice_chat(
     session_id = fields.get("session_id") or None
     if not guardian_id or not student_id:
         raise HTTPException(422, "guardian_id and student_id are required")
-    if language not in {None, "en", "hi", "te"}:
-        raise HTTPException(422, "language must be en, hi, or te")
+    if language not in {None, "en", "hi"}:
+        raise HTTPException(422, "language must be en or hi")
 
     # Authorization, consent, and linkage deliberately happen before STT.
     try:

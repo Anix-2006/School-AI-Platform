@@ -142,7 +142,12 @@
   };
 
   function roleForPath() {
-    if (["/flows/parent-chat", "/flows/ask-a-helper", "/flows/whatsapp"].includes(path)) return "parent";
+    if ([
+      "/flows/parent-chat",
+      "/flows/voice-assistant",
+      "/flows/ask-a-helper",
+      "/flows/whatsapp",
+    ].includes(path)) return "parent";
     if (path === "/flows/teacher-workspace") return "teacher";
     if (path.startsWith("/flows/")) return "management";
     try {

@@ -141,6 +141,15 @@ class ExcelStore:
                             col: _clean(col, raw[i] if i < len(raw) else None)
                             for i, col in enumerate(cols) if col
                         })
+                    if ws.title == "guardians":
+                        for record in records:
+                            language = record.get("preferred_language")
+                            if language not in {"en", "hi"}:
+                                logger.warning(
+                                    "Guardian %s has unsupported preferred_language; using en",
+                                    record.get("id"),
+                                )
+                                record["preferred_language"] = "en"
                     sheets[ws.title] = records
             finally:
                 wb.close()

@@ -12,7 +12,8 @@ class AgentState(TypedDict):
     tenant_id: str
     student_id: Optional[str]
     guardian_id: str
-    language: str            # en / hi / te
+    language: str            # interface/profile language
+    reply_language: Optional[str]  # en / hi, selected per voice turn
     channel: Literal["chat", "voice"]
     age_tier: Optional[str]  # pre_primary / primary_lower / primary
     intent: Optional[str]    # set by orchestrator's router step

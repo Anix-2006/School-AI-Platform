@@ -31,13 +31,12 @@ intent_classifier = IntentClassifier.load()
 
 # Route definitions double as the labeling guide for data/intent/*.jsonl.
 ROUTER_PROMPT = """Classify the parent's latest message into exactly one route.
-Parents write in English, Hindi, Hinglish (romanized Hindi), or Telugu.
+Parents write in English, Hindi, or Hinglish (romanized Hindi).
 
 - "daily_update" - a specific day at school: attendance, being late or
   leaving early, homework, diary notes, care log (nap, meals, mood),
   today's class activity.
-  e.g. "Was my child present today?", "Aaj ka homework kya hai?",
-  "ఈరోజు హోంవర్క్ ఏమిటి?"
+  e.g. "Was my child present today?", "Aaj ka homework kya hai?"
 - "academic" - results and progress: marks, test/FA/SA scores, rank card,
   report card, syllabus progress or chapters completed, developmental
   milestones, whether performance is improving or dropping.

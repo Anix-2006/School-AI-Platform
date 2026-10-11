@@ -1,6 +1,28 @@
 (() => {
   "use strict";
 
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function voiceIcon(className = "voice-nav-icon") {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", className);
+    svg.setAttribute("viewBox", "0 0 48 48");
+    svg.setAttribute("aria-hidden", "true");
+    const body = document.createElementNS(SVG_NS, "path");
+    body.setAttribute("d", "M9 21C9 10 16 4 24 4s15 6 15 17v10c0 8-7 14-15 14S9 39 9 31V21Z");
+    body.setAttribute("fill", "#176B5B");
+    const face = document.createElementNS(SVG_NS, "path");
+    face.setAttribute("d", "M14 20c0-7 4-11 10-11s10 4 10 11v6c0 6-4 10-10 10s-10-4-10-10v-6Z");
+    face.setAttribute("fill", "#FFFDF8");
+    const eyes = document.createElementNS(SVG_NS, "path");
+    eyes.setAttribute("d", "M17 21a3 3 0 1 0 6 0 3 3 0 0 0-6 0Zm8 0a3 3 0 1 0 6 0 3 3 0 0 0-6 0ZM20 29q4 4 8 0");
+    eyes.setAttribute("fill", "none");
+    eyes.setAttribute("stroke", "#17332E");
+    eyes.setAttribute("stroke-width", "2");
+    eyes.setAttribute("stroke-linecap", "round");
+    svg.append(body, face, eyes);
+    return svg;
+  }
+
   if (!document.querySelector('link[rel~="icon"]')) {
     const icon = document.createElement("link");
     icon.rel = "icon";
@@ -12,6 +34,7 @@
     { href: "/", path: "/", label: "Choose a role", home: true },
     { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview", group: "Explore" },
     { href: "/flows/parent-chat", path: "/flows/parent-chat", label: "Parent chat", group: "Parent" },
+    { href: "/flows/voice-assistant", path: "/flows/voice-assistant", label: "Voice", group: "Parent", voice: true },
     { href: "/flows/ask-a-helper", path: "/flows/ask-a-helper", label: "Ask a helper", group: "Parent" },
     { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp", group: "Parent" },
     { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace", group: "Teacher" },
@@ -68,7 +91,12 @@
     const link = document.createElement("a");
     link.href = item.href;
     link.dataset.path = item.path;
-    link.textContent = item.label;
+    if (item.voice) {
+      link.classList.add("sidebar-voice-link");
+      link.append(voiceIcon(), document.createTextNode(item.label));
+    } else {
+      link.textContent = item.label;
+    }
     nav.appendChild(link);
   });
 
@@ -87,7 +115,10 @@
   const language = document.createElement("select");
   language.id = "sidebarLanguage";
   language.className = "sidebar-language";
-  [["en", "English"], ["hi", "हिन्दी"], ["te", "తెలుగు"]].forEach(([value, label]) => {
+  const languageOptions = window.location.pathname === "/flows/voice-assistant"
+    ? [["en", "English"], ["hi", "हिन्दी"]]
+    : [["en", "English"], ["hi", "हिन्दी"], ["te", "తెలుగు"]];
+  languageOptions.forEach(([value, label]) => {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = label;
@@ -96,4 +127,49 @@
   footer.append(roleLabel, roleValue, languageLabel, language);
 
   mount.replaceChildren(homeLink, nav, footer);
+
+  const currentPath = window.location.pathname.replace(/\/$/, "") || "/";
+  const bottomNav = document.createElement("nav");
+  bottomNav.className = "mobile-bottom-nav";
+  bottomNav.setAttribute("aria-label", "Parent navigation");
+  const bottomItems = [
+    ["Home", "/", "M5 11 12 5l7 6v8h-5v-5h-4v5H5z"],
+    ["Chat", "/flows/parent-chat", "M4 5h16v12H9l-5 3z"],
+    ["Voice", "/flows/voice-assistant", ""],
+    ["Updates", "/flows/daily-updates", "M5 5h14v14H5zM8 9h8M8 13h6"],
+  ];
+  bottomItems.forEach(([label, href, path]) => {
+    const link = document.createElement("a");
+    link.href = href;
+    if (href === currentPath) {
+      link.classList.add("active");
+      link.setAttribute("aria-current", "page");
+    }
+    if (label === "Voice") {
+      link.classList.add("mobile-voice-destination");
+      link.appendChild(voiceIcon("bottom-voice-icon"));
+    } else {
+      const icon = document.createElementNS(SVG_NS, "svg");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("aria-hidden", "true");
+      const shape = document.createElementNS(SVG_NS, "path");
+      shape.setAttribute("d", path);
+      icon.appendChild(shape);
+      link.appendChild(icon);
+    }
+    const text = document.createElement("span");
+    text.textContent = label;
+    link.appendChild(text);
+    bottomNav.appendChild(link);
+  });
+  document.body.appendChild(bottomNav);
+
+  if (currentPath === "/flows/parent-chat") {
+    const launch = document.createElement("a");
+    launch.className = "floating-voice-launch";
+    launch.href = "/flows/voice-assistant";
+    launch.setAttribute("aria-label", "Open hands-free voice assistant");
+    launch.append(voiceIcon("floating-voice-icon"));
+    document.body.appendChild(launch);
+  }
 })();

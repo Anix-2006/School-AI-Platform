@@ -9,7 +9,12 @@ import pytest
 
 from app.voice.audio import AudioValidationError, validate_audio
 from app.voice.speech_text import TRUNCATION_NOTICE, clean_for_speech
-from app.voice.service import VoiceError, VoiceService, audio_owner_key
+from app.voice.service import (
+    VoiceError,
+    VoiceService,
+    audio_owner_key,
+    choose_reply_language,
+)
 from app.voice.stt import Transcript
 from app.voice.storage import AudioStore
 
@@ -70,9 +75,23 @@ def test_cleaner_makes_school_content_speakable():
     assert len(capped) <= 400
     assert capped.endswith(TRUNCATION_NOTICE)
     assert clean_for_speech("शब्द " * 200, "hi").endswith("पूरा उत्तर स्क्रीन पर है।")
-    assert clean_for_speech("పదం " * 200, "te").endswith(
-        "పూర్తి సమాధానం స్క్రీన్‌పై ఉంది."
+    assert clean_for_speech("**FA1:** 42/50 on 2026-10-09", "hi") == (
+        "एफ ए 1: 42 में से 50 on 9 अक्टूबर 2026"
     )
+
+
+@pytest.mark.parametrize(
+    ("text", "detected", "expected"),
+    [
+        ("What is today's homework?", "en", "en"),
+        ("आज का होमवर्क क्या है?", "en", "hi"),
+        ("Aaj ka homework kya hai?", "hi", "hi"),
+        ("", None, "en"),
+        ("ఏమిటి", "te", "en"),
+    ],
+)
+def test_reply_language_is_chosen_per_turn(text, detected, expected):
+    assert choose_reply_language(Transcript(text, detected, 1, 1)) == expected
 
 
 def test_audio_validation_is_in_memory_and_bounded():
@@ -118,7 +137,7 @@ def test_audio_store_enforces_owner_expiry_and_one_download():
     assert store.take(audio_id, owner) == b"sound"
     assert store.take(audio_id, owner) is None
     expired = store.put(owner, b"old")
-    time.sleep(0.03)
+    time.sleep(0.08)
     assert store.take(expired, owner) is None
 
 
@@ -156,14 +175,14 @@ def test_tts_failure_degrades_to_text(monkeypatch):
     assert result["reply"] == "**Answer**"
     assert result["tts_degraded"] is True
     assert result["audio_id"] is None
-    assert stt.arguments[0][1] == "en"
+    assert stt.arguments[0][1] is None
     assert result["language"] == "en"
 
 
 def test_silence_returns_localized_reply_without_llm(monkeypatch):
     from app.voice import service as module
 
-    stt = FakeStt(text="", language="te")
+    stt = FakeStt(text="", language=None)
     tts = FakeTts(fail=True)
 
     def unexpected_llm(*_args):
@@ -174,7 +193,7 @@ def test_silence_returns_localized_reply_without_llm(monkeypatch):
     result = asyncio.run(
         service.chat(
             tenant_id="t-1",
-            guardian={"id": "g-1", "preferred_language": "te"},
+            guardian={"id": "g-1", "preferred_language": "en"},
             student={"id": "s-1", "name": "Ananya"},
             audio=b"audio",
             content_type="audio/webm",
@@ -184,7 +203,7 @@ def test_silence_returns_localized_reply_without_llm(monkeypatch):
     )
     assert result["agent_used"] is None
     assert result["transcript"] == ""
-    assert result["language"] == "te"
+    assert result["language"] == "en"
     assert result["timings"]["llm"] == 0
     assert result["reply"]
     assert result["tts_degraded"] is True
@@ -226,7 +245,7 @@ def test_pipeline_passes_content_type_student_prompt_and_timings(monkeypatch):
         )
     )
     assert calls == ["stt", "llm", "tts"]
-    assert stt.arguments[0][0:2] == ("audio/ogg", "hi")
+    assert stt.arguments[0][0:2] == ("audio/ogg", None)
     assert "Ananya" in stt.arguments[0][2]
     assert all(key in result["timings"] for key in ("stt", "llm", "tts", "total"))
 
@@ -389,7 +408,25 @@ def test_voice_chat_openapi_describes_multipart_fields(client):
     schema = operation["requestBody"]["content"]["multipart/form-data"]["schema"]
     assert schema["required"] == ["audio", "guardian_id", "student_id"]
     assert schema["properties"]["audio"]["format"] == "binary"
-    assert schema["properties"]["language"]["enum"] == ["en", "hi", "te"]
+    assert schema["properties"]["language"]["enum"] == ["en", "hi"]
+
+
+def test_voice_rejects_telugu_language(client):
+    from app.main import app
+
+    stt = FakeStt()
+    app.state.voice_runtime = FakeRuntime(VoiceService(stt, FakeTts(), AudioStore()))
+    response = client.post(
+        "/voice/chat",
+        data={
+            "guardian_id": "g-3-1",
+            "student_id": "s-3-1",
+            "language": "te",
+        },
+        files={"audio": ("voice.wav", wav_bytes(), "audio/wav")},
+    )
+    assert response.status_code == 422
+    assert stt.calls == 0
 
 
 def test_voice_rejects_oversize_and_wrong_type_before_stt(client, monkeypatch):
@@ -478,3 +515,15 @@ def test_lifespan_warms_in_background_and_cleans_up():
         asyncio.run(run())
     finally:
         app.state.voice_runtime = old_runtime
+
+
+def test_hands_free_voice_page_and_mascot_assets_are_served(client):
+    page = client.get("/flows/voice-assistant")
+    assert page.status_code == 200
+    assert "Start voice assistant" in page.text
+    assert "vaani-mascot" in page.text
+    assert "onclick=" not in page.text
+    for size in (32, 512):
+        image = client.get(f"/voice-mascot-{size}.png")
+        assert image.status_code == 200
+        assert image.headers["content-type"] == "image/png"

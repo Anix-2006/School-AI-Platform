@@ -8,10 +8,12 @@ TRUNCATION_NOTICE = "The full answer is on screen."
 TRUNCATION_NOTICES = {
     "en": TRUNCATION_NOTICE,
     "hi": "पूरा उत्तर स्क्रीन पर है।",
-    "te": "పూర్తి సమాధానం స్క్రీన్‌పై ఉంది.",
 }
 _MONTHS = (
     "January February March April May June July August September October November December"
+).split()
+_HINDI_MONTHS = (
+    "जनवरी फ़रवरी मार्च अप्रैल मई जून जुलाई अगस्त सितंबर अक्टूबर नवंबर दिसंबर"
 ).split()
 
 
@@ -21,14 +23,18 @@ def clean_for_speech(
     value = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
     value = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", value)
     value = re.sub(r"[*_#>`~•]+", " ", value)
-    value = re.sub(r"(?i)\bFA\s*(\d+)\b", r"formative assessment \1", value)
-    value = re.sub(r"(?i)\bSA\s*(\d+)\b", r"summative assessment \1", value)
+    fa_label = r"एफ ए \1" if language == "hi" else r"formative assessment \1"
+    sa_label = r"एस ए \1" if language == "hi" else r"summative assessment \1"
+    value = re.sub(r"(?i)\bFA\s*(\d+)\b", fa_label, value)
+    value = re.sub(r"(?i)\bSA\s*(\d+)\b", sa_label, value)
+    marks_label = r"\1 में से \2" if language == "hi" else r"\1 out of \2"
     value = re.sub(
         r"(?<!\w)(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)(?!\w)",
-        r"\1 out of \2",
+        marks_label,
         value,
     )
-    value = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", _speak_date, value)
+    date_formatter = _speak_date_hi if language == "hi" else _speak_date
+    value = re.sub(r"\b(\d{4})-(\d{2})-(\d{2})\b", date_formatter, value)
     value = re.sub(r"[✅❌⭐✓✗→←©®™@|{}[\]<>]", " ", value)
     value = re.sub(r"\s+", " ", value).strip()
     if len(value) <= max_chars:
@@ -50,6 +56,14 @@ def _speak_date(match: re.Match[str]) -> str:
     except ValueError:
         return match[0]
     return f"{parsed.day}{_ordinal_suffix(parsed.day)} {_MONTHS[parsed.month - 1]} {parsed.year}"
+
+
+def _speak_date_hi(match: re.Match[str]) -> str:
+    try:
+        parsed = date(int(match[1]), int(match[2]), int(match[3]))
+    except ValueError:
+        return match[0]
+    return f"{parsed.day} {_HINDI_MONTHS[parsed.month - 1]} {parsed.year}"
 
 
 def _ordinal_suffix(day: int) -> str:

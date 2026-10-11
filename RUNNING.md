@@ -32,7 +32,7 @@ voice model, limits, and audio cache in one process. Close
 `.env.example` lists every setting read by `app/config.py`. Voice defaults are:
 
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
-- `WHISPER_MODEL=base`, `WHISPER_COMPUTE_TYPE=int8`, and
+- `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
 - `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
 - `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
@@ -43,8 +43,11 @@ voice model, limits, and audio cache in one process. Close
   60 seconds.
 - `VOICE_SPEAK_RATE=20`: `/voice/speak` requests per authenticated owner per
   60 seconds.
-- `VOICE_TTS_TIMEOUT=12.0`: seconds per gTTS attempt; one retry is made.
+- `VOICE_TTS_TIMEOUT=4.0`: seconds per gTTS attempt; one retry is made.
 - `VOICE_AUDIO_TTL=300.0`: generated chat audio lifetime in process memory.
+- `VOICE_VAD_SILENCE_MS=800`: browser silence interval that ends a turn.
+- `VOICE_IDLE_PROMPT_SECONDS=20`: silence before Vaani asks if the parent is
+  still present.
 
 Restart the service after changing environment variables.
 
@@ -59,10 +62,9 @@ Microphone capture requires a secure browser context. Browsers make an
 exception for `http://localhost`, so local development works without TLS.
 Remote deployments must use HTTPS and the user must grant microphone access.
 
-The UI tries browser recording formats in this order: WebM/Opus, Ogg/Opus,
-MP4/AAC, AAC, then MP4. The microphone button is hidden if `MediaRecorder` or
-all of those formats are unavailable. Browser and OS support varies. The API
-also validates WAV and MP3 uploads.
+The hands-free UI at `/flows/voice-assistant` prefers low-bitrate mono
+WebM/Opus, then MP4/AAC for Safari, then Ogg/Opus. Browser and OS support
+varies. The API also validates WAV and MP3 uploads.
 
 ## Manual checks
 
@@ -92,14 +94,13 @@ curl.exe -sS -X POST "$base/voice/chat" `
 
 UI check:
 
-1. Open `http://localhost:8000/flows/parent-chat`.
+1. Open `http://localhost:8000/flows/voice-assistant`.
 2. Confirm text chat works while voice is disabled or warming.
-3. When ready, confirm the microphone button appears.
-4. Confirm the privacy prompt, permission denied, recording timer/level,
-   cancel/stop, uploading, transcribing, thinking, busy, and retry states.
-5. Confirm the editable transcript, text reply, play/pause, replay, progress,
-   and audio-error fallback. Change guardian while a request is active and
-   confirm stale audio is not attached.
+3. Tap **Start voice assistant** once and grant microphone access.
+4. Confirm listening stops after speech plus about 800 ms silence, the answer
+   plays automatically, and listening resumes without another tap.
+5. Confirm captions, mute, stop/restart, idle prompt, barge-in, permission,
+   offline, busy, no-consent, and text-only audio fallback states.
 6. Repeat on a narrow phone viewport and at desktop width. Test at least
    Chrome/Edge and one Safari/Firefox target because recording formats differ.
 
@@ -133,20 +134,16 @@ These are local measurements, not Render measurements. `base` leaves too
 little safety margin on a 512 MB instance, so `tiny` remains the recommended
 free-plan model until the deployed service is measured directly.
 
-The model currently downloads during background application startup, not
-during build and not on the first request. Render's ephemeral filesystem means
-the download can repeat after a cold deploy or restart; `/voice/status` remains
-`warming` meanwhile. A build-time prefetch can be added later, for example
-after dependency installation:
+The Dockerfile prefetches its `WHISPER_MODEL` build argument (default `tiny`)
+into the image. Native Render builds that only run `pip install` still
+download during background application startup; `/voice/status` remains
+`warming` meanwhile. A native build can prefetch explicitly:
 
 ```bash
 python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', device='cpu', compute_type='int8')"
 ```
 
-That command is optional and is **not configured now**. Before using it,
-confirm Render preserves the selected model cache in the deployed artifact and
-that build/runtime model names match. Do not describe the current deployment
-as build-time-prefetched.
+Keep build/runtime model names identical.
 
 After deploy, use the API and UI checks above with
 `$base = "https://YOUR-SERVICE.onrender.com"`. HTTPS is required for the remote
@@ -172,10 +169,11 @@ secrets, consent/audit controls, and a durable database.
 
 ## Known limits
 
-- Voice is request/response, not streaming.
+- Whisper is not streaming, and gTTS returns finished MP3 data. Zero latency
+  is not possible with these tools; browser VAD removes the manual stop delay.
 - gTTS is an unofficial Google Translate client. It needs internet access and
   can fail or be rate-limited by the upstream service.
-- Hindi and Telugu recognition can be lower with small Whisper models.
+- Hindi recognition can be lower than English with small Whisper models.
 - Model size is constrained by instance memory.
 - Whisper, TTS cache, rate limits, and generated audio storage are
   process-local.
@@ -187,12 +185,11 @@ above are claimed.
 
 ## Verification templates — NOT YET MEASURED
 
-### Accuracy: 10 recordings x 3 languages
+### Accuracy: 15 recordings in two languages
 
-Prepare 30 recordings named `accuracy/en-01.webm` through `en-10.webm`,
-`hi-01.webm` through `hi-10.webm`, and `te-01.webm` through `te-10.webm`.
-Use the same ten school questions translated by a fluent speaker. Create the
-result sheet before testing:
+Prepare ten English recordings named `accuracy/en-01.webm` through
+`en-10.webm` and five Hindi recordings `hi-01.webm` through `hi-05.webm`.
+Create the result sheet before testing:
 
 ```powershell
 '"environment,model,language,item,expected,transcript,pass,notes' |
@@ -202,33 +199,34 @@ result sheet before testing:
 For each file, run the upload command from the manual API check with the
 matching `language`, copy the returned `transcript`, and append one CSV row.
 Mark `pass` only when the school terms, names/numbers, and question intent are
-usable. Record all 30 rows locally, then repeat against Render. Keep the raw
+usable. Record all 15 rows locally, then repeat against Render. Keep the raw
 files and rubric fixed when comparing `tiny` and `base`.
 
 Result placeholders:
 
 ```text
-Local / model ______: NOT YET MEASURED (en __/10, hi __/10, te __/10)
-Render / model _____: NOT YET MEASURED (en __/10, hi __/10, te __/10)
+Local / model ______: NOT YET MEASURED (en __/10, hi __/5)
+Render / model _____: NOT YET MEASURED (en __/10, hi __/5)
 ```
 
-### Latency: 20 voice questions, p50/p95
+### Latency: 15 voice questions, p50/p95
 
-Prepare representative files `perf/q01.webm` through `q20.webm`. Warm the
+Prepare representative files `perf/q01.webm` through `q15.webm`. Warm the
 service first and confirm `/voice/status` is `ready`; note cold-start/model
 warm time separately. This PowerShell loop captures the server's stage and
 total timings:
 
 ```powershell
-$rows = 1..20 | ForEach-Object {
+$rows = 1..15 | ForEach-Object {
   $file = "perf/q{0:d2}.webm" -f $_
   $json = curl.exe -sS -X POST "$base/voice/chat" `
     -H "Authorization: Bearer $token" `
     -F "guardian_id=$guardian" -F "student_id=$student" `
     -F "language=en" -F "session_id=perf-$($_)" `
     -F "audio=@$file;type=audio/webm" | ConvertFrom-Json
-  [pscustomobject]@{ item=$_; queue=$json.timings.queue; stt=$json.timings.stt;
-    llm=$json.timings.llm; tts=$json.timings.tts; total=$json.timings.total }
+  $t = $json.timings_ms
+  [pscustomobject]@{ item=$_; upload=$t.upload; decode=$t.decode; queue=$t.queue;
+    stt=$t.stt; router=$t.router; agent_llm=$t.agent_llm; tts=$t.tts; total=$t.total }
 }
 $rows | Export-Csv latency-results.csv -NoTypeInformation
 function Percentile($values, $p) {
@@ -239,7 +237,7 @@ function Percentile($values, $p) {
 "p95_ms=$(Percentile $rows.total 0.95)"
 ```
 
-Run once locally and once on Render with the same 20 files and model. Also
+Run once locally and once on Render with the same 15 files and model. Also
 save model, instance plan, date, failures, and whether the service was warm.
 
 ```text

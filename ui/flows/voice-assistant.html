@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice assistant — School Parent AI</title>
+<link rel="stylesheet" href="/styles.css?v=voice2">
+<link rel="icon" type="image/png" sizes="32x32" href="/voice-mascot-32.png">
+<meta property="og:image" content="/voice-mascot-512.png">
+</head>
+<body class="voice-mode-body">
+<header class="topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <a class="topbar-brand" href="/flows/parent-chat">School Parent AI</a>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header">
+    <h2>Pages</h2>
+    <button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div id="app-nav"></div>
+</aside>
+
+<main class="voice-mode-page" id="main">
+  <section class="voice-mode-panel" aria-labelledby="voiceTitle">
+    <div class="voice-mode-heading">
+      <a class="voice-back" href="/flows/parent-chat" aria-label="Back to parent chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+      </a>
+      <div>
+        <p class="eyebrow">Hands-free assistant</p>
+        <h1 id="voiceTitle">Voice assistant</h1>
+      </div>
+      <span class="voice-language-chip" id="detectedLanguage">EN</span>
+    </div>
+
+    <label class="sr-only" for="voiceGuardian">Child</label>
+    <select id="voiceGuardian" class="child-switcher">
+      <option value="">Loading children…</option>
+    </select>
+
+    <div class="voice-stage" id="voiceStage" data-state="idle">
+      <svg class="vaani-mascot" viewBox="0 0 240 220" role="img" aria-label="Vaani, the School Parent AI voice assistant">
+        <g class="vaani-ring">
+          <circle cx="120" cy="108" r="92"/>
+          <circle cx="120" cy="108" r="78"/>
+        </g>
+        <g class="vaani-float">
+          <path class="vaani-body" d="M57 87c0-42 28-68 63-68s63 26 63 68v59c0 33-27 59-60 59h-6c-33 0-60-26-60-59V87Z"/>
+          <path class="vaani-ear" d="M65 61 40 38l5 48M175 61l25-23-5 48"/>
+          <path class="vaani-face" d="M72 91c0-30 20-48 48-48s48 18 48 48v31c0 27-21 48-48 48s-48-21-48-48V91Z"/>
+          <g class="vaani-eyes">
+            <ellipse cx="98" cy="103" rx="13" ry="16"/>
+            <ellipse cx="142" cy="103" rx="13" ry="16"/>
+            <circle cx="101" cy="100" r="4"/>
+            <circle cx="145" cy="100" r="4"/>
+          </g>
+          <path class="vaani-brow" d="M84 82q14-9 28 0M128 82q14-9 28 0"/>
+          <path class="vaani-mouth" d="M106 132q14 13 28 0"/>
+          <g class="vaani-headset">
+            <path d="M72 102a48 48 0 0 1 96 0"/>
+            <rect x="60" y="99" width="16" height="35" rx="8"/>
+            <rect x="164" y="99" width="16" height="35" rx="8"/>
+            <path d="M172 130q-2 18-25 20"/>
+            <circle cx="144" cy="150" r="5"/>
+          </g>
+          <g class="vaani-dots">
+            <circle cx="104" cy="136" r="4"/>
+            <circle cx="120" cy="136" r="4"/>
+            <circle cx="136" cy="136" r="4"/>
+          </g>
+          <path class="vaani-tail" d="M91 199 76 215l2-27"/>
+        </g>
+      </svg>
+      <span class="vaani-name">Vaani</span>
+      <strong id="voiceState">Ready when you are</strong>
+      <p id="voiceHint">Tap once to start. After that, just speak naturally.</p>
+      <div class="voice-energy" aria-hidden="true"><span id="voiceEnergy"></span></div>
+    </div>
+
+    <button type="button" class="primary voice-start" id="startVoice">Start voice assistant</button>
+
+    <section class="voice-captions" id="voiceCaptions" aria-label="Conversation captions" hidden>
+      <div>
+        <span>You said</span>
+        <p id="voiceTranscript">—</p>
+      </div>
+      <div>
+        <span>Assistant</span>
+        <p id="voiceReply">—</p>
+      </div>
+    </section>
+
+    <div class="voice-mode-controls">
+      <button type="button" class="secondary voice-control" id="muteVoice" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span>Mute</span>
+      </button>
+      <button type="button" class="secondary voice-control" id="toggleCaptions" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 10h4M7 14h4M13 10h4M13 14h4"/></svg>
+        <span>Show text</span>
+      </button>
+      <button type="button" class="secondary voice-control" id="stopVoice">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>
+        <span>Stop</span>
+      </button>
+    </div>
+    <p class="voice-privacy-copy">Voice is processed to answer your question and is not stored as audio.</p>
+    <div id="voiceError" class="error retry-row" role="alert" hidden>
+      <span id="voiceErrorText"></span>
+      <button type="button" class="secondary" id="retryVoice">Try again</button>
+    </div>
+    <span class="sr-only" id="voiceLive" aria-live="polite"></span>
+  </section>
+</main>
+
+<script src="/nav.js?v=voice2"></script>
+<script src="/sidebar.js?v=voice2"></script>
+<script src="/api.js?v=voice2"></script>
+<script>
+(() => {
+  "use strict";
+
+  const SILENCE_MS = 800;
+  const IDLE_MS = 20000;
+  const MAX_MS = 30000;
+  const stateLabel = document.getElementById("voiceState");
+  const hint = document.getElementById("voiceHint");
+  const stage = document.getElementById("voiceStage");
+  const live = document.getElementById("voiceLive");
+  const startButton = document.getElementById("startVoice");
+  const stopButton = document.getElementById("stopVoice");
+  const muteButton = document.getElementById("muteVoice");
+  const captionsButton = document.getElementById("toggleCaptions");
+  const captions = document.getElementById("voiceCaptions");
+  const transcriptText = document.getElementById("voiceTranscript");
+  const replyText = document.getElementById("voiceReply");
+  const guardianSelect = document.getElementById("voiceGuardian");
+  const languageChip = document.getElementById("detectedLanguage");
+  const energyBar = document.getElementById("voiceEnergy");
+  const errorBox = document.getElementById("voiceError");
+  const errorText = document.getElementById("voiceErrorText");
+
+  let contexts = [];
+  let mode = "idle";
+  let stream = null;
+  let recorder = null;
+  let chunks = [];
+  let audioContext = null;
+  let analyser = null;
+  let analyserData = null;
+  let meterFrame = 0;
+  let playbackSource = null;
+  let requestController = null;
+  let heardSpeech = false;
+  let speechStartedAt = 0;
+  let lastLoudAt = 0;
+  let idleSince = 0;
+  let idlePrompted = false;
+  let muted = false;
+  let stopped = true;
+  let cancelledTurn = false;
+  let sessionId = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const labels = {
+    en: {
+      idle: "Ready when you are", listening: "Listening", thinking: "Thinking",
+      speaking: "Speaking", stopped: "Tap to start again", error: "Needs attention",
+      listenHint: "Ask about attendance, homework, syllabus or marks.",
+      thinkingHint: "Your answer is being prepared.", speakingHint: "You can interrupt by speaking.",
+      idlePrompt: "Are you still there?",
+    },
+    hi: {
+      idle: "आप जब चाहें शुरू करें", listening: "सुन रही हूँ", thinking: "सोच रही हूँ",
+      speaking: "बोल रही हूँ", stopped: "फिर शुरू करने के लिए टैप करें", error: "ध्यान देने की ज़रूरत है",
+      listenHint: "उपस्थिति, होमवर्क, सिलेबस या अंकों के बारे में पूछें।",
+      thinkingHint: "आपका उत्तर तैयार हो रहा है।", speakingHint: "आप बोलकर बीच में रोक सकते हैं।",
+      idlePrompt: "क्या आप अभी भी वहाँ हैं?",
+    },
+  };
+
+  function currentLanguage() {
+    return languageChip.textContent === "हिं" ? "hi" : "en";
+  }
+
+  function setMode(next, message = "") {
+    mode = next;
+    stage.dataset.state = next;
+    const copy = labels[currentLanguage()] || labels.en;
+    stateLabel.textContent = copy[next] || copy.idle;
+    hint.textContent = message || copy[`${next}Hint`] || "";
+    live.textContent = stateLabel.textContent;
+  }
+
+  function context() {
+    return contexts.find((item) => String(item.id) === guardianSelect.value);
+  }
+
+  function mimeType() {
+    return [
+      "audio/webm;codecs=opus",
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+    ].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
+
+  function showError(message) {
+    errorText.textContent = message;
+    errorBox.hidden = false;
+    setMode("error", message);
+  }
+
+  async function unlockAudio() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) throw new Error("Audio playback is not supported in this browser.");
+    audioContext ||= new AudioContextClass();
+    await audioContext.resume();
+    const silent = audioContext.createBuffer(1, 1, 22050);
+    const source = audioContext.createBufferSource();
+    source.buffer = silent;
+    source.connect(audioContext.destination);
+    source.start();
+  }
+
+  async function ensureStream() {
+    if (stream?.active) return;
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 512;
+    analyserData = new Float32Array(analyser.fftSize);
+    source.connect(analyser);
+    monitorLevel();
+  }
+
+  function rmsLevel() {
+    if (!analyser || !analyserData) return 0;
+    analyser.getFloatTimeDomainData(analyserData);
+    const sum = analyserData.reduce((total, sample) => total + sample * sample, 0);
+    return Math.sqrt(sum / analyserData.length);
+  }
+
+  function monitorLevel() {
+    const level = rmsLevel();
+    energyBar.style.width = `${Math.min(100, level * 900)}%`;
+    stage.style.setProperty("--mouth-scale", String(Math.min(2.6, 0.7 + level * 15)));
+    const now = performance.now();
+    if (mode === "listening" && !muted) {
+      if (level > 0.035) {
+        heardSpeech = true;
+        lastLoudAt = now;
+      } else if (heardSpeech && now - lastLoudAt >= SILENCE_MS) {
+        finishTurn();
+      } else if (!heardSpeech && Date.now() - idleSince >= IDLE_MS) {
+        handleIdle();
+      }
+    } else if (mode === "speaking" && level > 0.11) {
+      if (!speechStartedAt) speechStartedAt = now;
+      if (now - speechStartedAt > 180) interruptForBargeIn();
+    } else {
+      speechStartedAt = 0;
+    }
+    meterFrame = window.requestAnimationFrame(monitorLevel);
+  }
+
+  async function startAssistant() {
+    errorBox.hidden = true;
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      showError("This browser does not support microphone recording.");
+      return;
+    }
+    try {
+      startButton.disabled = true;
+      setMode("thinking", "Waking up the server. This can take up to a minute.");
+      await Promise.all([SchoolAPI.health(), SchoolAPI.voiceStatus(), unlockAudio()]);
+      await ensureStream();
+      stopped = false;
+      idlePrompted = false;
+      startButton.hidden = true;
+      startListening();
+    } catch (error) {
+      startButton.disabled = false;
+      const denied = ["NotAllowedError", "SecurityError"].includes(error?.name);
+      showError(denied
+        ? "Microphone permission was denied. Allow access and try again."
+        : error.message || "The voice assistant could not start.");
+    }
+  }
+
+  function startListening(resetIdle = true) {
+    if (stopped || muted || recorder?.state === "recording") return;
+    if (resetIdle) idlePrompted = false;
+    heardSpeech = false;
+    lastLoudAt = performance.now();
+    idleSince = Date.now();
+    chunks = [];
+    cancelledTurn = false;
+    const type = mimeType();
+    recorder = type
+      ? new MediaRecorder(stream, { mimeType: type, audioBitsPerSecond: 24000 })
+      : new MediaRecorder(stream);
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size) chunks.push(event.data);
+    });
+    recorder.addEventListener("stop", processTurn, { once: true });
+    recorder.start(200);
+    setMode("listening");
+    window.setTimeout(() => {
+      if (recorder?.state === "recording" && mode === "listening") finishTurn();
+    }, MAX_MS);
+  }
+
+  function finishTurn() {
+    if (recorder?.state !== "recording") return;
+    setMode("thinking");
+    recorder.stop();
+  }
+
+  async function processTurn() {
+    const parts = chunks.slice();
+    chunks = [];
+    recorder = null;
+    if (cancelledTurn || stopped) return;
+    if (!heardSpeech || !parts.length) {
+      startListening(false);
+      return;
+    }
+    const type = parts[0].type || "audio/webm";
+    const blob = new Blob(parts, { type });
+    const selected = context();
+    if (!selected) {
+      showError("Choose a linked child before starting voice mode.");
+      return;
+    }
+    const form = new FormData();
+    form.append("audio", blob, "voice");
+    form.append("guardian_id", String(selected.id));
+    form.append("student_id", String(selected.student_id));
+    form.append("session_id", sessionId);
+    requestController = new AbortController();
+    try {
+      const data = await SchoolAPI.voiceChat(form, requestController.signal);
+      transcriptText.textContent = data.transcript || "—";
+      replyText.textContent = data.reply || "—";
+      languageChip.textContent = data.language === "hi" ? "हिं" : "EN";
+      if (!data.audio_id) {
+        showError("The answer is shown as text, but audio is temporarily unavailable.");
+        return;
+      }
+      const audioBlob = await SchoolAPI.voiceAudio(data.audio_id, String(selected.id));
+      await playBlob(audioBlob, true);
+    } catch (error) {
+      if (error?.name === "AbortError" || stopped) return;
+      showError(error.message || "The voice question could not be processed.");
+    } finally {
+      requestController = null;
+    }
+  }
+
+  async function playBlob(blob, resumeListening) {
+    const bytes = await blob.arrayBuffer();
+    const buffer = await audioContext.decodeAudioData(bytes.slice(0));
+    playbackSource?.stop();
+    playbackSource = audioContext.createBufferSource();
+    playbackSource.buffer = buffer;
+    playbackSource.connect(audioContext.destination);
+    playbackSource.addEventListener("ended", () => {
+      playbackSource = null;
+      if (resumeListening && !stopped && mode === "speaking") startListening();
+    }, { once: true });
+    setMode("speaking");
+    playbackSource.start();
+  }
+
+  async function handleIdle() {
+    if (mode !== "listening") return;
+    if (idlePrompted) {
+      stopAssistant();
+      return;
+    }
+    idlePrompted = true;
+    cancelledTurn = true;
+    if (recorder?.state === "recording") recorder.stop();
+    try {
+      const phrase = labels[currentLanguage()].idlePrompt;
+      const blob = await SchoolAPI.voiceSpeak(phrase, currentLanguage());
+      await playBlob(blob, true);
+    } catch {
+      stopAssistant();
+    }
+  }
+
+  function interruptForBargeIn() {
+    if (mode !== "speaking") return;
+    playbackSource?.stop();
+    playbackSource = null;
+    requestController?.abort();
+    startListening();
+  }
+
+  function stopAssistant() {
+    stopped = true;
+    cancelledTurn = true;
+    requestController?.abort();
+    requestController = null;
+    playbackSource?.stop();
+    playbackSource = null;
+    if (recorder?.state === "recording") recorder.stop();
+    recorder = null;
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = null;
+    analyser = null;
+    analyserData = null;
+    startButton.hidden = false;
+    startButton.disabled = false;
+    startButton.textContent = "Start again";
+    setMode("stopped");
+  }
+
+  muteButton.addEventListener("click", () => {
+    muted = !muted;
+    muteButton.setAttribute("aria-pressed", String(muted));
+    muteButton.querySelector("span").textContent = muted ? "Unmute" : "Mute";
+    stream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+    if (muted && recorder?.state === "recording") {
+      cancelledTurn = true;
+      recorder.stop();
+      setMode("idle", "Microphone muted.");
+    } else if (!muted && !stopped) {
+      startListening();
+    }
+  });
+  captionsButton.addEventListener("click", () => {
+    captions.hidden = !captions.hidden;
+    captionsButton.setAttribute("aria-pressed", String(!captions.hidden));
+    captionsButton.querySelector("span").textContent = captions.hidden ? "Show text" : "Hide text";
+  });
+  startButton.addEventListener("click", startAssistant);
+  stopButton.addEventListener("click", stopAssistant);
+  document.getElementById("retryVoice").addEventListener("click", startAssistant);
+  guardianSelect.addEventListener("change", () => {
+    sessionId = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopAssistant();
+  });
+  window.addEventListener("pagehide", () => {
+    stopAssistant();
+    window.cancelAnimationFrame(meterFrame);
+    audioContext?.close().catch(() => {});
+  });
+
+  Promise.all([SchoolAPI.ensureAuth(), SchoolAPI.listParentContexts()])
+    .then(([_auth, items]) => {
+      contexts = items;
+      guardianSelect.replaceChildren();
+      items.forEach((item) => {
+        const option = document.createElement("option");
+        option.value = String(item.id);
+        option.textContent = `${item.student_name} — ${item.grade || ""} ${item.section || ""}`.trim();
+        guardianSelect.appendChild(option);
+      });
+      if (!items.length) showError("No linked children are available.");
+    })
+    .catch((error) => showError(error.message));
+})();
+</script>
+</body>
+</html>
