@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     whisper_model: str = "tiny"
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
+    whisper_workers: int = 1
     voice_max_concurrency: int = 1
     voice_max_seconds: float = 30
     voice_max_bytes: int = 5_242_880

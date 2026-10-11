@@ -1,6 +1,7 @@
 import asyncio
 import io
 import sys
+import threading
 import time
 import types
 import wave
@@ -15,7 +16,7 @@ from app.voice.service import (
     audio_owner_key,
     choose_reply_language,
 )
-from app.voice.stt import Transcript
+from app.voice.stt import Transcript, transcribe_async
 from app.voice.storage import AudioStore
 
 
@@ -92,6 +93,67 @@ def test_cleaner_makes_school_content_speakable():
 )
 def test_reply_language_is_chosen_per_turn(text, detected, expected):
     assert choose_reply_language(Transcript(text, detected, 1, 1)) == expected
+
+
+def test_transcribe_async_uses_whisper_worker_threads():
+    names = []
+
+    class Engine:
+        def transcribe(self, *_args):
+            names.append(threading.current_thread().name)
+            return Transcript("Any homework?", "en", 1.0, 1.0)
+
+    result = asyncio.run(transcribe_async(Engine(), b"audio", "audio/wav"))
+    assert result.text == "Any homework?"
+    assert names and names[0].startswith("whisper")
+
+
+def test_health_answers_during_slow_stt(client, monkeypatch):
+    from app.voice import service as module
+
+    started = threading.Event()
+    stt = FakeStt(delay=1.2)
+    original = stt.transcribe
+
+    def transcribe(*args):
+        started.set()
+        return original(*args)
+
+    stt.transcribe = transcribe
+    monkeypatch.setattr(
+        module,
+        "run_parent_turn",
+        lambda *_args: {"reply": "Answer", "student_id": "s-3-1", "language": "en"},
+    )
+    service = VoiceService(stt, FakeTts(), AudioStore())
+    error = []
+
+    def run_chat():
+        try:
+            asyncio.run(
+                service.chat(
+                    tenant_id="t-1",
+                    guardian={"id": "g-3-1", "preferred_language": "en"},
+                    student={"id": "s-3-1"},
+                    audio=b"audio",
+                    content_type="audio/wav",
+                    language="en",
+                    session_id=None,
+                )
+            )
+        except Exception as exc:
+            error.append(exc)
+
+    worker = threading.Thread(target=run_chat)
+    worker.start()
+    assert started.wait(timeout=2)
+    began = time.perf_counter()
+    health = client.get("/health")
+    assert time.perf_counter() - began < 0.5
+    assert health.json() == {"status": "ok"}
+    worker.join(timeout=5)
+    assert not worker.is_alive()
+    assert error == []
 
 
 def test_audio_validation_is_in_memory_and_bounded():
