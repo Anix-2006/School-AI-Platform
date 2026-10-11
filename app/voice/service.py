@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 import threading
 import time
@@ -11,6 +12,8 @@ from app.voice.speech_text import clean_for_speech
 from app.voice.stt import SttEngine, Transcript
 from app.voice.storage import AudioStore
 from app.voice.tts import TtsEngine
+
+logger = logging.getLogger(__name__)
 
 
 class VoiceError(Exception):
@@ -79,6 +82,8 @@ class VoiceService:
         content_type: str,
         language: str | None,
         session_id: str | None,
+        upload_ms: int = 0,
+        decode_ms: int = 0,
     ) -> dict:
         self.check_rate("chat", guardian["id"])
         started = time.perf_counter()
@@ -109,6 +114,8 @@ class VoiceService:
                     started,
                     queued,
                     transcribed,
+                    upload_ms,
+                    decode_ms,
                 )
             thread_id = (
                 f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
@@ -135,6 +142,27 @@ class VoiceService:
                 if speech
                 else None
             )
+            router_ms = int(result.get("router_ms") or 0)
+            agent_ms = int(result.get("agent_llm_ms") or max(
+                0, round((replied - transcribed) * 1000) - router_ms
+            ))
+            timings_ms = {
+                "upload": upload_ms,
+                "decode": decode_ms,
+                "queue": round((queued - started) * 1000),
+                "stt": round((transcribed - queued) * 1000),
+                "router": router_ms,
+                "agent_llm": agent_ms,
+                "tts": round((finished - replied) * 1000),
+            }
+            timings_ms["total"] = sum(timings_ms.values())
+            logger.info(
+                "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
+                guardian["id"],
+                session_id or "default",
+                chosen_language,
+                timings_ms,
+            )
             return {
                 **result,
                 "transcript": transcript.text,
@@ -142,12 +170,13 @@ class VoiceService:
                 "audio_id": audio_id,
                 "tts_degraded": not bool(speech),
                 "timings": {
-                    "queue": round((queued - started) * 1000),
-                    "stt": round((transcribed - queued) * 1000),
-                    "llm": round((replied - transcribed) * 1000),
-                    "tts": round((finished - replied) * 1000),
-                    "total": round((finished - started) * 1000),
+                    "queue": timings_ms["queue"],
+                    "stt": timings_ms["stt"],
+                    "llm": timings_ms["router"] + timings_ms["agent_llm"],
+                    "tts": timings_ms["tts"],
+                    "total": timings_ms["total"],
                 },
+                "timings_ms": timings_ms,
             }
         finally:
             self._slots.release()
@@ -162,6 +191,8 @@ class VoiceService:
         started: float,
         queued: float,
         transcribed: float,
+        upload_ms: int,
+        decode_ms: int,
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
@@ -170,6 +201,16 @@ class VoiceService:
         except Exception:
             speech = b""
         finished = time.perf_counter()
+        timings_ms = {
+            "upload": upload_ms,
+            "decode": decode_ms,
+            "queue": round((queued - started) * 1000),
+            "stt": round((transcribed - queued) * 1000),
+            "router": 0,
+            "agent_llm": 0,
+            "tts": round((finished - tts_started) * 1000),
+        }
+        timings_ms["total"] = sum(timings_ms.values())
         return {
             "reply": reply,
             "transcript": transcript.text,
@@ -186,12 +227,13 @@ class VoiceService:
             ),
             "tts_degraded": not bool(speech),
             "timings": {
-                "queue": round((queued - started) * 1000),
-                "stt": round((transcribed - queued) * 1000),
+                "queue": timings_ms["queue"],
+                "stt": timings_ms["stt"],
                 "llm": 0,
-                "tts": round((finished - tts_started) * 1000),
-                "total": round((finished - started) * 1000),
+                "tts": timings_ms["tts"],
+                "total": timings_ms["total"],
             },
+            "timings_ms": timings_ms,
         }
 
     async def speak(self, text: str, language: str, owner_id: str) -> bytes:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import threading
+import wave
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -16,6 +17,7 @@ class Transcript:
 
 class SttEngine(Protocol):
     def load(self) -> None: ...
+    def warmup(self) -> None: ...
 
     def transcribe(
         self,
@@ -47,6 +49,26 @@ class FasterWhisperEngine:
                     self.model_name, device=self.device, compute_type=self.compute_type
                 )
 
+    def warmup(self) -> None:
+        """Run one silent second at startup so the first parent does not pay setup cost."""
+        self.load()
+        target = io.BytesIO()
+        with wave.open(target, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(16000)
+            output.writeframes(b"\0\0" * 16000)
+        segments, _info = self._model.transcribe(
+            io.BytesIO(target.getvalue()),
+            language="en",
+            vad_filter=True,
+            beam_size=1,
+            best_of=1,
+            temperature=0,
+            condition_on_previous_text=False,
+        )
+        list(segments)
+
     def transcribe(
         self,
         audio_bytes: bytes,
@@ -60,7 +82,10 @@ class FasterWhisperEngine:
             language=language,
             initial_prompt=initial_prompt,
             vad_filter=True,
-            beam_size=5,
+            beam_size=1,
+            best_of=1,
+            temperature=0,
+            condition_on_previous_text=False,
         )
         parts = list(segments)
         text = " ".join(segment.text.strip() for segment in parts if segment.text.strip()).strip()
