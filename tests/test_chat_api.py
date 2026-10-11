@@ -29,6 +29,7 @@ def test_reply_uses_guardian_child_and_language(client, graph):
     assert state["student_id"] == "s-3-1"
     assert state["language"] == "hi"
     assert state["age_tier"] == "primary"
+    assert state["channel"] == "chat"
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == PRIYA
 
 
@@ -60,6 +61,37 @@ def test_guardian_without_consent_gets_no_reply(client, graph):
 def test_session_id_gives_a_separate_memory_thread(client, graph):
     client.post("/chat", json={"guardian_id": PRIYA, "message": "hi", "session_id": "abc"})
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:abc"
+
+
+def test_shared_message_handler_reuses_chat_thread_for_other_channels(graph, store):
+    result = chat_service.handle_parent_message(
+        store.default_tenant_id(),
+        PRIYA,
+        "Voice question",
+        session_id="call-1",
+        channel="voice",
+    )
+
+    assert result["student_id"] == "s-3-1"
+    assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:call-1"
+    conversations = store.find("conversations", guardian_id=PRIYA)
+    assert conversations[0]["channel"] == "voice"
+    messages = store.find("messages", conversation_id=conversations[0]["id"])
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Voice question"
+
+
+def test_shared_message_handler_preserves_access_errors(graph, store):
+    with pytest.raises(chat_service.ChatAccessError) as exc_info:
+        chat_service.handle_parent_message(
+            store.default_tenant_id(),
+            "g-nobody",
+            "hi",
+            channel="voice",
+        )
+
+    assert exc_info.value.status_code == 404
+    assert graph.calls == []
 
 
 def test_turn_is_saved_to_conversations_and_messages(client, graph, store):

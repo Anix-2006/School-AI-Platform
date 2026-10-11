@@ -12,6 +12,10 @@ Client (WhatsApp/voice/app) -> FastAPI gateway -> LangGraph orchestrator
 
 See `app/agents/orchestrator.py` for the graph definition.
 
+Voice adds in-memory audio validation, faster-whisper speech-to-text, the same
+chat access checks/orchestrator/history, and gTTS speech output. It is disabled
+by default.
+
 ## Structure
 
 ```
@@ -37,6 +41,10 @@ docker compose up --build
 ```
 
 API docs at http://localhost:8000/docs once running.
+
+For the Python 3.11 setup, voice configuration, secure-browser requirements,
+manual checks, Render deployment, limits, and unmeasured verification
+templates, see [RUNNING.md](RUNNING.md). Run one uvicorn worker.
 
 ## Demo data
 

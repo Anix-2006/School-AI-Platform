@@ -32,9 +32,12 @@ Do not insert untrusted values directly with `innerHTML`.
 
 ## Responsive shell
 
-- Below `640px`: compact mobile content and stacked controls.
-- From `640px`: tablet content gains wider padding and multi-column layouts
-  where each flow supports them.
+- Mobile-first layouts are the default. Small-flow adjustments occur at
+  `420px`, `430px`, and `599px`; task rows stack through `640px`.
+- Records widen at `620px` and switch from cards to a table at `760px`.
+- Most parent, teacher, role, and management grids widen from `700px`.
+- Older workspace/helper layouts widen at `800px`, parent chat at `860px`,
+  and the teacher dashboard at `900px`.
 - From `1024px`: the fixed `17rem` sidebar and desktop content topbar are
   persistent. The hamburger, close button, and backdrop are hidden.
 - From `1440px`: shell gutters widen while content stays centred at a maximum
@@ -42,6 +45,22 @@ Do not insert untrusted values directly with `innerHTML`.
 
 The sidebar remains keyboard reachable on desktop. Mobile drawer focus
 management and all layouts below `1024px` remain unchanged.
+
+## Voice controls and states
+
+Voice is on `/flows/parent-chat` when the API reports `ready` and the browser
+supports `MediaRecorder`. The UI includes:
+
+- a microphone/stop button, one-time privacy acknowledgement, recording timer,
+  input level, cancel, and permission/device errors;
+- warming, offline, uploading, transcribing, thinking, busy, unclear-audio,
+  ready, and playback-error states, with text chat available as fallback;
+- an editable transcript and text reply;
+- play/pause, replay, and seek controls for the generated reply.
+
+The browser format preference is WebM/Opus, Ogg/Opus, MP4/AAC, AAC, then MP4.
+Availability differs by browser and OS. Microphone access works on
+`http://localhost`; non-local pages require HTTPS and user permission.
 
 ## Security and data limits
 

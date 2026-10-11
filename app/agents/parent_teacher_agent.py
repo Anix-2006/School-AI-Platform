@@ -8,6 +8,7 @@ from app.agents.language import language_name
 from app.agents.state import AgentState
 from app.agents.tools import PARENT_TEACHER_TOOLS
 from app.agents.tool_loop import run_tool_loop
+from app.agents.voice_prompt import voice_prompt
 
 # Stronger model - parent-teacher messages carry escalation and privacy
 # rules where tone and judgment matter more than per-message cost.
@@ -69,5 +70,5 @@ def parent_teacher_node(state: AgentState) -> dict:
             KNOWN_STUDENT_INSTRUCTION if student_id else UNKNOWN_STUDENT_INSTRUCTION
         ),
     )
-    messages = [SystemMessage(content=prompt)] + state["messages"]
+    messages = [SystemMessage(content=prompt + voice_prompt(state))] + state["messages"]
     return run_tool_loop(llm, messages, PARENT_TEACHER_TOOLS)
