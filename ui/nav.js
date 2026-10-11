@@ -9,17 +9,28 @@
     svg.setAttribute("aria-hidden", "true");
     const body = document.createElementNS(SVG_NS, "path");
     body.setAttribute("d", "M9 21C9 10 16 4 24 4s15 6 15 17v10c0 8-7 14-15 14S9 39 9 31V21Z");
-    body.setAttribute("fill", "#176B5B");
+    body.setAttribute("fill", "#2DD4FF");
     const face = document.createElementNS(SVG_NS, "path");
     face.setAttribute("d", "M14 20c0-7 4-11 10-11s10 4 10 11v6c0 6-4 10-10 10s-10-4-10-10v-6Z");
-    face.setAttribute("fill", "#FFFDF8");
+    face.setAttribute("fill", "#071D40");
     const eyes = document.createElementNS(SVG_NS, "path");
     eyes.setAttribute("d", "M17 21a3 3 0 1 0 6 0 3 3 0 0 0-6 0Zm8 0a3 3 0 1 0 6 0 3 3 0 0 0-6 0ZM20 29q4 4 8 0");
     eyes.setAttribute("fill", "none");
-    eyes.setAttribute("stroke", "#17332E");
+    eyes.setAttribute("stroke", "#FFC22E");
     eyes.setAttribute("stroke-width", "2");
     eyes.setAttribute("stroke-linecap", "round");
     svg.append(body, face, eyes);
+    return svg;
+  }
+
+  function lineIcon(pathData, className = "nav-line-icon") {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", className);
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", pathData);
+    svg.appendChild(path);
     return svg;
   }
 
@@ -31,17 +42,17 @@
   }
 
   window.APP_NAV = [
-    { href: "/", path: "/", label: "Choose a role", home: true },
-    { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview", group: "Explore" },
-    { href: "/flows/parent-chat", path: "/flows/parent-chat", label: "Parent chat", group: "Parent" },
+    { href: "/", path: "/", label: "Choose a role", home: true, icon: "M4 11 12 4l8 7v9h-5v-6H9v6H4z" },
+    { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview", group: "Explore", icon: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" },
+    { href: "/flows/parent-chat", path: "/flows/parent-chat", label: "Parent chat", group: "Parent", icon: "M4 5h16v12H9l-5 3z" },
     { href: "/flows/voice-assistant", path: "/flows/voice-assistant", label: "Voice", group: "Parent", voice: true },
-    { href: "/flows/ask-a-helper", path: "/flows/ask-a-helper", label: "Ask a helper", group: "Parent" },
-    { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp", group: "Parent" },
-    { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace", group: "Teacher" },
-    { href: "/flows/daily-updates", path: "/flows/daily-updates", label: "Daily updates", group: "Management" },
-    { href: "/flows/risk-alerts", path: "/flows/risk-alerts", label: "Risk alerts", group: "Management" },
-    { href: "/flows/school-records", path: "/flows/school-records", label: "School records", group: "Management" },
-    { href: "/flows/school-account", path: "/flows/school-account", label: "School account", group: "Management" },
+    { href: "/flows/ask-a-helper", path: "/flows/ask-a-helper", label: "Ask a helper", group: "Parent", icon: "M12 3 9.8 8.8 4 11l5.8 2.2L12 19l2.2-5.8L20 11l-5.8-2.2z" },
+    { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp", group: "Parent", icon: "M7 18 4 20l1-4a8 8 0 1 1 3 3z" },
+    { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace", group: "Teacher", icon: "M4 5c4-1 6 0 8 2 2-2 4-3 8-2v14c-4-1-6 0-8 2-2-2-4-3-8-2z" },
+    { href: "/flows/daily-updates", path: "/flows/daily-updates", label: "Daily updates", group: "Management", icon: "M5 4h14v16H5zM8 2v4M16 2v4M5 9h14" },
+    { href: "/flows/risk-alerts", path: "/flows/risk-alerts", label: "Risk alerts", group: "Management", icon: "M12 3 20 7v5c0 5-3 8-8 10-5-2-8-5-8-10V7zM12 8v5M12 17h.01" },
+    { href: "/flows/school-records", path: "/flows/school-records", label: "School records", group: "Management", icon: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8-1a2.5 2.5 0 1 0 0-5M3 20v-3c0-3 2-5 5-5s5 2 5 5v3M15 12c3 0 5 2 5 5v3" },
+    { href: "/flows/school-account", path: "/flows/school-account", label: "Settings", settings: true, icon: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4 2 1-2 4-2-.5-1.5 1.5.5 2-4 2-1-2-2-.5-1 1.5-4-2 .5-2L5 16.5 3 17l-2-4 2-1 .5-2L2 8l4-2 1.5 1.5 2-.5 1-2h4l1 2 2 .5L19 6l3 2-2 2z" },
   ];
 
   const mount = document.getElementById("app-nav");
@@ -59,10 +70,10 @@
   mark.setAttribute("aria-hidden", "true");
   const shield = document.createElementNS("http://www.w3.org/2000/svg", "path");
   shield.setAttribute("d", "M8 13.5 24 6l16 7.5v21L24 42 8 34.5z");
-  shield.setAttribute("fill", "#176B5B");
+  shield.setAttribute("fill", "#2DD4FF");
   const book = document.createElementNS("http://www.w3.org/2000/svg", "path");
   book.setAttribute("d", "M14 17.5c4.8 0 8.1 1.1 10 3.4 1.9-2.3 5.2-3.4 10-3.4v15.1c-4.7 0-8 1.1-10 3.4-2-2.3-5.3-3.4-10-3.4z");
-  book.setAttribute("fill", "#FFFDF8");
+  book.setAttribute("fill", "#071D40");
   mark.append(shield, book);
   const brandName = document.createElement("span");
   brandName.textContent = "School Parent AI";
@@ -70,12 +81,12 @@
   sidebarHeader?.prepend(brand);
 
   const home = window.APP_NAV.find((item) => item.home);
-  const links = window.APP_NAV.filter((item) => !item.home);
+  const links = window.APP_NAV.filter((item) => !item.home && !item.settings);
   const homeLink = document.createElement("a");
   homeLink.className = "sidebar-home";
   homeLink.href = home.href;
   homeLink.dataset.path = home.path;
-  homeLink.textContent = home.label;
+  homeLink.append(lineIcon(home.icon), document.createTextNode(home.label));
 
   const nav = document.createElement("nav");
   nav.setAttribute("aria-label", "Platform pages");
@@ -95,13 +106,19 @@
       link.classList.add("sidebar-voice-link");
       link.append(voiceIcon(), document.createTextNode(item.label));
     } else {
-      link.textContent = item.label;
+      link.append(lineIcon(item.icon), document.createTextNode(item.label));
     }
     nav.appendChild(link);
   });
 
   const footer = document.createElement("div");
   footer.className = "sidebar-footer";
+  const settingsItem = window.APP_NAV.find((item) => item.settings);
+  const settingsLink = document.createElement("a");
+  settingsLink.className = "sidebar-settings";
+  settingsLink.href = settingsItem.href;
+  settingsLink.dataset.path = settingsItem.path;
+  settingsLink.append(lineIcon(settingsItem.icon), document.createTextNode(settingsItem.label));
   const roleLabel = document.createElement("span");
   roleLabel.className = "sidebar-footer-label";
   roleLabel.textContent = "Current role";
@@ -124,7 +141,7 @@
     option.textContent = label;
     language.appendChild(option);
   });
-  footer.append(roleLabel, roleValue, languageLabel, language);
+  footer.append(settingsLink, roleLabel, roleValue, languageLabel, language);
 
   mount.replaceChildren(homeLink, nav, footer);
 
