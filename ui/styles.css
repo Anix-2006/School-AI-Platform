@@ -4662,3 +4662,136 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   .voice-stage { min-height: 18rem; }
   .vaani-mascot { width: min(200px, 68vw); }
 }
+
+/* Next UI — teacher workspace */
+.teacher-hero {
+  padding: clamp(22px, 4vw, 36px);
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255, 194, 46, 0.16), transparent 13rem),
+    linear-gradient(135deg, rgba(15, 69, 139, 0.92), rgba(8, 30, 67, 0.9));
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.teacher-hero h1 { margin: 4px 0 6px; }
+.teacher-hero .lead { margin: 0; color: var(--text-muted); }
+.teacher-switch select { background: rgba(4, 20, 48, 0.7); }
+.teacher-profile {
+  background:
+    linear-gradient(145deg, rgba(25, 67, 119, 0.74), rgba(8, 30, 67, 0.88));
+  border-color: var(--border);
+}
+.teacher-profile .avatar {
+  color: #061a3a;
+  background: linear-gradient(135deg, var(--accent-2), #d5faff);
+}
+.teacher-card {
+  background:
+    linear-gradient(145deg, rgba(20, 59, 108, 0.74), rgba(7, 27, 61, 0.88));
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow-sm);
+}
+.teacher-section-heading {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.teacher-section-heading h2 { margin: 0; padding: 0; border: 0; }
+.teacher-section-heading .eyebrow { color: var(--accent-2); }
+.count-badge {
+  color: #061a3a;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.period-card, .week-lesson {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--border);
+  border-radius: 14px;
+}
+.period-card.current-period, .week-lesson.current-period {
+  color: #07172f;
+  background: linear-gradient(135deg, var(--accent), #ffe08a);
+  border-color: var(--accent);
+  box-shadow: 0 8px 22px rgba(255, 194, 46, 0.18);
+}
+.period-card.current-period .meta,
+.week-lesson.current-period span { color: #273653; }
+.current-label {
+  color: #061a3a;
+  background: var(--accent-2);
+}
+.week-scroll, .desktop-week-scroll {
+  scrollbar-color: rgba(45, 212, 255, 0.4) transparent;
+}
+.week-table {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.week-table th { background: #0a2857; }
+.week-table td { background: rgba(4, 20, 48, 0.45); }
+.week-table .today-heading, .week-table .today-column {
+  background: rgba(45, 212, 255, 0.09);
+}
+.task-list { gap: 10px; }
+.task-card {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--border);
+  border-radius: 15px;
+}
+.task-card:hover { border-color: rgba(45, 212, 255, 0.4); }
+.task-checkbox { accent-color: var(--accent); }
+.task-meta { color: var(--text-muted); }
+.completed-task { opacity: 0.62; }
+.chip {
+  color: #dff8ff;
+  background: rgba(45, 212, 255, 0.1);
+  border-color: rgba(45, 212, 255, 0.22);
+}
+.chip.done, .chip.completed { color: #b8ffd8; background: rgba(82, 227, 154, 0.13); }
+.chip.in_progress { color: #ffe7a6; background: rgba(255, 194, 46, 0.12); }
+.syllabus-group {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--border);
+  border-radius: 16px;
+}
+.syllabus-header h3 { color: var(--text); }
+.progress-value { color: var(--accent-2); }
+.progress-track { background: rgba(255, 255, 255, 0.09); }
+.progress-fill { background: linear-gradient(90deg, var(--accent-2), #9ef1ff); }
+.chapter-list li { border-color: var(--border); }
+.student-tools {
+  padding: 14px;
+  background: rgba(4, 20, 48, 0.42);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.student-table-wrap {
+  max-height: min(34rem, 55vh);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  scrollbar-color: rgba(45, 212, 255, 0.4) transparent;
+}
+.student-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #0a2857;
+}
+.attendance.present { color: #b8ffd8; }
+.attendance.absent { color: #ffd1d5; }
+.attendance.unmarked { color: var(--text-muted); }
+
+@media (min-width: 1024px) {
+  body > main.teacher-page {
+    padding: 28px;
+  }
+  .teacher-desktop-layout { gap: 22px; }
+  .teacher-dashboard { gap: 18px; }
+  .teacher-card { padding: 20px; }
+}
