@@ -8,6 +8,7 @@ from app.agents.language import language_name
 from app.agents.state import AgentState
 from app.agents.tools import COMMUNICATION_TOOLS
 from app.agents.tool_loop import run_tool_loop
+from app.agents.voice_prompt import voice_prompt
 
 llm = ChatOpenAI(model=settings.openai_model_strong, api_key=settings.openai_api_key).bind_tools(
     COMMUNICATION_TOOLS
@@ -44,5 +45,5 @@ def communication_node(state: AgentState) -> dict:
         tenant_id=state.get("tenant_id") or "unknown",
         today=date.today().isoformat(),
     )
-    messages = [SystemMessage(content=prompt)] + state["messages"]
+    messages = [SystemMessage(content=prompt + voice_prompt(state))] + state["messages"]
     return run_tool_loop(llm, messages, COMMUNICATION_TOOLS)

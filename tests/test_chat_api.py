@@ -29,6 +29,7 @@ def test_reply_uses_guardian_child_and_language(client, graph):
     assert state["student_id"] == "s-3-1"
     assert state["language"] == "hi"
     assert state["age_tier"] == "primary"
+    assert state["channel"] == "chat"
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == PRIYA
 
 
@@ -75,6 +76,9 @@ def test_shared_message_handler_reuses_chat_thread_for_other_channels(graph, sto
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:call-1"
     conversations = store.find("conversations", guardian_id=PRIYA)
     assert conversations[0]["channel"] == "voice"
+    messages = store.find("messages", conversation_id=conversations[0]["id"])
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Voice question"
 
 
 def test_shared_message_handler_preserves_access_errors(graph, store):
