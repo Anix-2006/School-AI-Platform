@@ -4523,10 +4523,70 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   max-height: 230px;
   filter: drop-shadow(0 20px 30px rgba(0, 8, 28, 0.38));
 }
+.shizuka-avatar {
+  position: relative;
+  width: min(230px, 72vw);
+  height: 230px;
+  animation: shizuka-breathe 3.2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
 .vaani-mascot.shizuka-photo {
+  display: block;
+  width: 100%;
   height: 230px;
   object-fit: contain;
   transition: transform 180ms ease-out, filter 180ms ease-out;
+}
+.shizuka-mouth-motion {
+  position: absolute;
+  top: 29.5%;
+  left: 46%;
+  z-index: 2;
+  width: 14px;
+  height: 5px;
+  opacity: 0;
+  background: #8f1f35;
+  border: 1px solid #321018;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scaleY(0.7);
+  transform-origin: center;
+}
+.shizuka-ear-signal {
+  position: absolute;
+  top: 21%;
+  left: 62%;
+  z-index: 2;
+  width: 17px;
+  height: 25px;
+  opacity: 0;
+  border: 3px solid var(--accent-2);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(8deg) scale(0.7);
+}
+.shizuka-ear-signal::after {
+  position: absolute;
+  inset: -9px;
+  content: "";
+  border: 2px solid var(--accent-2);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-radius: 50%;
+}
+.shizuka-thinking-dots {
+  position: absolute;
+  top: 8%;
+  right: 17%;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+.shizuka-thinking-dots i {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
 }
 .vaani-body { fill: #0b4a9e; stroke: var(--accent-2); stroke-width: 5; }
 .vaani-face { fill: #dff8ff; }
@@ -4569,13 +4629,36 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
 .vaani-ring circle { stroke: var(--accent-2); }
 .vaani-dots circle { fill: var(--accent); }
 .vaani-name { color: var(--accent-2); font-family: inherit; }
-.voice-stage[data-state="listening"] .shizuka-photo {
+.voice-stage[data-state="listening"] .shizuka-avatar {
   transform: scale(1.04);
+}
+.voice-stage[data-state="listening"] .shizuka-photo {
   filter: drop-shadow(0 0 22px rgba(45, 212, 255, 0.5));
 }
-.voice-stage[data-state="thinking"] .shizuka-photo { animation: vaani-look 1.2s ease-in-out infinite alternate; }
-.voice-stage[data-state="speaking"] .shizuka-photo { animation: shizuka-speak 500ms ease-in-out infinite alternate; }
-.voice-stage[data-state="error"] .shizuka-photo { transform: rotate(-5deg); }
+.voice-stage[data-state="listening"] .shizuka-ear-signal {
+  opacity: 1;
+  animation: shizuka-hear 900ms ease-out infinite;
+}
+.voice-stage[data-state="thinking"] .shizuka-avatar { animation: vaani-look 1.2s ease-in-out infinite alternate; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots { opacity: 1; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots i { animation: vaani-dot 700ms ease-in-out infinite alternate; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots i:nth-child(2) { animation-delay: 120ms; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots i:nth-child(3) { animation-delay: 240ms; }
+.voice-stage[data-state="speaking"] .shizuka-avatar { animation: shizuka-speak 500ms ease-in-out infinite alternate; }
+.voice-stage[data-state="speaking"] .shizuka-mouth-motion {
+  opacity: 1;
+  transform: translate(-50%, -50%) scaleY(var(--mouth-scale, 1));
+  transition: transform 80ms linear;
+}
+.voice-stage[data-state="error"] .shizuka-avatar { transform: rotate(-5deg); animation: none; }
+@keyframes shizuka-breathe {
+  50% { transform: translateY(-4px); }
+}
+@keyframes shizuka-hear {
+  0% { opacity: 0; transform: rotate(8deg) scale(0.55); }
+  45% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(8deg) scale(1.2); }
+}
 @keyframes shizuka-speak {
   to { transform: scale(1.035); }
 }
