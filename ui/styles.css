@@ -205,7 +205,13 @@
 .voice-captions p { margin: 4px 0 0; overflow-wrap: anywhere; }
 .voice-privacy-copy { margin: 0; color: var(--muted); text-align: center; font-size: 0.8rem; }
 .sidebar-voice-link { display: flex !important; align-items: center; gap: 8px; }
-.voice-nav-icon { width: 25px; height: 25px; flex: 0 0 auto; }
+.voice-nav-icon {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 50%;
+}
 
 .mobile-bottom-nav {
   position: fixed;
@@ -245,6 +251,8 @@
   height: 42px;
   margin-top: -22px;
   overflow: visible;
+  object-fit: cover;
+  border-radius: 50%;
   filter: drop-shadow(0 5px 8px rgba(23, 51, 46, 0.2));
   stroke: none;
 }
@@ -264,7 +272,7 @@
   box-shadow: var(--shadow-md);
 }
 .floating-voice-launch:hover { transform: translateY(-2px); }
-.floating-voice-icon { width: 50px; height: 50px; }
+.floating-voice-icon { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; }
 .parent-chat-card .voice-button,
 .parent-chat-card .voice-recorder,
 .parent-chat-card .voice-privacy { display: none !important; }
@@ -4207,6 +4215,10 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   overflow: visible;
   filter: drop-shadow(0 24px 35px rgba(0, 8, 28, 0.34));
 }
+.entry-vaani.shizuka-photo {
+  max-height: 250px;
+  object-fit: contain;
+}
 .entry-vaani-float { transform-origin: center; animation: vaani-float 4s ease-in-out infinite; }
 .entry-vaani-body { fill: #0b4a9e; stroke: var(--accent-2); stroke-width: 5; }
 .entry-vaani-face { fill: #dff8ff; }
@@ -4223,7 +4235,6 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
 .entry-vaani-eyes ellipse { fill: #fff; stroke: #061a3a; stroke-width: 4; }
 .entry-vaani-eyes circle { fill: #061a3a; }
 .entry-vaani-pocket { fill: rgba(45, 212, 255, 0.24); stroke: var(--accent-2); }
-
 .role-grid { gap: 14px; margin: 0; }
 .role-card {
   min-width: 0;
@@ -4512,6 +4523,11 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   max-height: 230px;
   filter: drop-shadow(0 20px 30px rgba(0, 8, 28, 0.38));
 }
+.vaani-mascot.shizuka-photo {
+  height: 230px;
+  object-fit: contain;
+  transition: transform 180ms ease-out, filter 180ms ease-out;
+}
 .vaani-body { fill: #0b4a9e; stroke: var(--accent-2); stroke-width: 5; }
 .vaani-face { fill: #dff8ff; }
 .vaani-eyes ellipse { fill: #fff; stroke: #061a3a; }
@@ -4553,6 +4569,16 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
 .vaani-ring circle { stroke: var(--accent-2); }
 .vaani-dots circle { fill: var(--accent); }
 .vaani-name { color: var(--accent-2); font-family: inherit; }
+.voice-stage[data-state="listening"] .shizuka-photo {
+  transform: scale(1.04);
+  filter: drop-shadow(0 0 22px rgba(45, 212, 255, 0.5));
+}
+.voice-stage[data-state="thinking"] .shizuka-photo { animation: vaani-look 1.2s ease-in-out infinite alternate; }
+.voice-stage[data-state="speaking"] .shizuka-photo { animation: shizuka-speak 500ms ease-in-out infinite alternate; }
+.voice-stage[data-state="error"] .shizuka-photo { transform: rotate(-5deg); }
+@keyframes shizuka-speak {
+  to { transform: scale(1.035); }
+}
 .voice-stage[data-state="waving"] .vaani-arm-right {
   transform-box: fill-box;
   transform-origin: left bottom;
