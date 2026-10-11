@@ -87,7 +87,7 @@ def test_audio_validation_is_in_memory_and_bounded():
 
 def test_non_wav_duration_uses_in_memory_decoder(monkeypatch):
     class Container:
-        duration = 2
+        duration = 2_000_000
 
         def __enter__(self):
             return self
@@ -96,7 +96,7 @@ def test_non_wav_duration_uses_in_memory_decoder(monkeypatch):
             return None
 
     fake_av = types.SimpleNamespace(
-        time_base=1,
+        time_base=1_000_000,
         open=lambda source, mode: (
             Container()
             if isinstance(source, io.BytesIO) and mode == "r"
@@ -104,6 +104,7 @@ def test_non_wav_duration_uses_in_memory_decoder(monkeypatch):
         ),
     )
     monkeypatch.setitem(sys.modules, "av", fake_av)
+    validate_audio(b"OggS-valid", "audio/ogg", max_bytes=100, max_seconds=3)
     with pytest.raises(AudioValidationError) as too_long:
         validate_audio(b"OggS-valid", "audio/ogg", max_bytes=100, max_seconds=1)
     assert too_long.value.status_code == 413

@@ -68,7 +68,7 @@ def _duration_seconds(audio: bytes, media_type: str) -> float:
 
         with av.open(io.BytesIO(audio), mode="r") as container:
             if container.duration is not None:
-                return float(container.duration * av.time_base)
+                return float(container.duration / av.time_base)
             stream = next((item for item in container.streams if item.type == "audio"), None)
             if stream is None:
                 raise AudioValidationError(422, "Audio stream is missing")
