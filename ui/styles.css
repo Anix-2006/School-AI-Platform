@@ -4795,3 +4795,206 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   .teacher-dashboard { gap: 18px; }
   .teacher-card { padding: 20px; }
 }
+
+/* Next UI — management, records and supporting flows */
+.management-body {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(45, 212, 255, 0.18), transparent 30rem),
+    radial-gradient(circle at 90% 22%, rgba(68, 116, 255, 0.28), transparent 34rem),
+    var(--bg-grad);
+}
+.management-hero,
+.records-hero {
+  padding: clamp(22px, 4vw, 36px);
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255, 194, 46, 0.16), transparent 13rem),
+    linear-gradient(135deg, rgba(15, 69, 139, 0.92), rgba(8, 30, 67, 0.9));
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.management-hero h1,
+.records-hero h1 { margin: 4px 0 6px; }
+.management-hero .lead,
+.records-hero .lead { color: var(--text-muted); }
+.management-eyebrow,
+.records-eyebrow { color: var(--accent); }
+.school-identity {
+  color: var(--text);
+  background: rgba(4, 20, 48, 0.54);
+  border-color: var(--border);
+}
+.school-identity span { color: var(--text-muted); }
+.section-heading { color: var(--text); }
+.metric-card,
+.management-link,
+.operation-card,
+.account-card,
+.privacy-card {
+  color: var(--text);
+  background:
+    linear-gradient(145deg, rgba(20, 59, 108, 0.76), rgba(7, 27, 61, 0.9));
+  border-color: var(--border);
+}
+.metric-card dt,
+.metric-card small,
+.management-link p,
+.operation-card > p,
+.account-row dt { color: var(--text-muted); }
+.metric-card dd,
+.management-link h3 { color: var(--text); }
+.metric-unavailable { border-style: dashed; }
+.metric-unavailable dd { color: #aebfd2; }
+.management-link:hover {
+  border-color: rgba(255, 194, 46, 0.5);
+  transform: translateY(-2px);
+}
+.management-link .link-arrow { color: var(--accent); }
+.summary-item,
+.preview-item {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--border);
+}
+.summary-item span,
+.preview-item .meta { color: var(--text-muted); }
+.operation-warning {
+  color: #ffe6a3;
+  background: rgba(255, 200, 87, 0.12);
+  border-color: rgba(255, 200, 87, 0.5);
+}
+.management-alert {
+  color: var(--text);
+  background: linear-gradient(145deg, rgba(20, 59, 108, 0.76), rgba(7, 27, 61, 0.9));
+  border-color: var(--border);
+  border-left-color: var(--warning);
+}
+.management-alert.severity-high { border-left-color: var(--danger); }
+.management-alert.severity-low { border-left-color: var(--accent-2); }
+.alert-header h3 { color: var(--text); }
+.alert-type { color: var(--text-muted); }
+.status-badge.high { color: #fff; background: #b93849; }
+.status-badge.medium { color: #241900; background: var(--warning); }
+.status-badge.low { color: #061a3a; background: var(--accent-2); }
+.status-badge.new { color: #061a3a; background: var(--accent); }
+.status-badge.open { color: var(--text); background: rgba(255,255,255,.1); }
+.limitation-note {
+  color: var(--text-muted);
+  background: rgba(45, 212, 255, 0.08);
+  border-color: var(--accent-2);
+}
+.account-row { border-color: var(--border); }
+.confirm-dialog,
+.student-dialog {
+  color: var(--text);
+  background: #092452;
+  border: 1px solid var(--border);
+}
+.confirm-dialog p,
+.student-dialog p { color: var(--text-muted); }
+.confirm-dialog::backdrop,
+.student-dialog::backdrop { background: rgba(0, 7, 24, 0.76); }
+
+.records-page { color: var(--text); }
+.records-hero { margin-bottom: 18px; }
+.records-shell {
+  background: linear-gradient(145deg, rgba(20, 59, 108, 0.72), rgba(7, 27, 61, 0.9));
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.records-tabs { border-color: var(--border); }
+.records-tab {
+  color: var(--text-muted);
+  background: transparent;
+}
+.records-tab.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.records-count {
+  color: #061a3a;
+  background: var(--accent);
+}
+.records-toolbar,
+.records-filters { border-color: var(--border); }
+.records-search span { color: var(--accent-2); }
+.records-table-wrap {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--border);
+  scrollbar-color: rgba(45, 212, 255, 0.4) transparent;
+}
+.records-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #0a2857;
+}
+.records-table td { color: var(--text); }
+.record-card {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: var(--border);
+}
+.record-card .meta,
+.records-status,
+.records-pagination p { color: var(--text-muted); }
+.records-pagination { border-color: var(--border); }
+.records-empty { color: var(--text-muted); }
+.records-empty h2 { color: var(--text); }
+.dialog-header,
+.dialog-actions { border-color: var(--border); }
+.dialog-close {
+  color: var(--text);
+  background: rgba(255,255,255,.07);
+  border-color: var(--border);
+}
+.dialog-close svg {
+  width: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.field-hint { color: var(--text-muted); }
+
+.helper-page .parent-page-heading,
+.whatsapp-page .parent-page-heading {
+  padding: clamp(22px, 4vw, 34px);
+  background:
+    radial-gradient(circle at 90% 10%, rgba(255, 194, 46, 0.14), transparent 12rem),
+    linear-gradient(135deg, rgba(15, 69, 139, 0.9), rgba(8, 30, 67, 0.88));
+  border: 1px solid var(--border);
+  border-radius: 24px;
+}
+.helper-card,
+.helper-compose,
+.sender-panel,
+.phone {
+  color: var(--text);
+  background: linear-gradient(145deg, rgba(20, 59, 108, 0.76), rgba(7, 27, 61, 0.9));
+  border-color: var(--border);
+}
+.helper-card p,
+.sender-panel p { color: var(--text-muted); }
+.phone-screen { background: rgba(4, 20, 48, 0.74); }
+.phone-header { color: var(--text); background: #0a2857; border-color: var(--border); }
+.phone-message {
+  color: var(--text);
+  background: rgba(255,255,255,.08);
+  border-color: var(--border);
+}
+
+@media (min-width: 1024px) {
+  body > main.management-page,
+  body > main.records-page { padding: 28px; }
+  .management-hero,
+  .records-hero { border-radius: 22px; }
+}
+
+@media (max-width: 639px) {
+  .management-page,
+  .records-page { padding-inline: 12px; }
+  .management-hero,
+  .records-hero { padding: 20px; border-radius: 20px; }
+}
