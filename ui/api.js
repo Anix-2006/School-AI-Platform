@@ -122,7 +122,9 @@
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeout);
     const slowTimer = window.setTimeout(() => {
-      announce("slow", "The school service is starting. This can take a few seconds.");
+      if (announceErrors) {
+        announce("slow", "The school service is starting. This can take a few seconds.");
+      }
     }, 2500);
 
     try {
