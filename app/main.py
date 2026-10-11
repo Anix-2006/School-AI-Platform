@@ -93,6 +93,13 @@ def ui_nav_js():
     return FileResponse(UI_DIR / "nav.js", media_type="application/javascript")
 
 
+@app.get("/voice-mascot-{size}.png")
+def voice_mascot(size: int):
+    if size not in {32, 512}:
+        raise HTTPException(status_code=404, detail="Mascot size not found")
+    return FileResponse(UI_DIR / "assets" / f"vaani-{size}.png", media_type="image/png")
+
+
 @app.get("/flows/{page}")
 def ui_flow_page(page: str):
     """Serve one of the flow-reference HTML pages."""

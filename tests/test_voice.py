@@ -515,3 +515,15 @@ def test_lifespan_warms_in_background_and_cleans_up():
         asyncio.run(run())
     finally:
         app.state.voice_runtime = old_runtime
+
+
+def test_hands_free_voice_page_and_mascot_assets_are_served(client):
+    page = client.get("/flows/voice-assistant")
+    assert page.status_code == 200
+    assert "Start voice assistant" in page.text
+    assert "vaani-mascot" in page.text
+    assert "onclick=" not in page.text
+    for size in (32, 512):
+        image = client.get(f"/voice-mascot-{size}.png")
+        assert image.status_code == 200
+        assert image.headers["content-type"] == "image/png"

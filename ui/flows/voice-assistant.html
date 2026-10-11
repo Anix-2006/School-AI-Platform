@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Voice assistant — School Parent AI</title>
 <link rel="stylesheet" href="/styles.css">
+<link rel="icon" type="image/png" sizes="32x32" href="/voice-mascot-32.png">
+<meta property="og:image" content="/voice-mascot-512.png">
 </head>
 <body class="voice-mode-body">
 <header class="topbar">
@@ -43,9 +45,39 @@
     </select>
 
     <div class="voice-stage" id="voiceStage" data-state="idle">
-      <div class="voice-placeholder-mark" aria-hidden="true">
-        <span></span>
-      </div>
+      <svg class="vaani-mascot" viewBox="0 0 240 220" role="img" aria-label="Vaani, the School Parent AI voice assistant">
+        <g class="vaani-ring">
+          <circle cx="120" cy="108" r="92"/>
+          <circle cx="120" cy="108" r="78"/>
+        </g>
+        <g class="vaani-float">
+          <path class="vaani-body" d="M57 87c0-42 28-68 63-68s63 26 63 68v59c0 33-27 59-60 59h-6c-33 0-60-26-60-59V87Z"/>
+          <path class="vaani-ear" d="M65 61 40 38l5 48M175 61l25-23-5 48"/>
+          <path class="vaani-face" d="M72 91c0-30 20-48 48-48s48 18 48 48v31c0 27-21 48-48 48s-48-21-48-48V91Z"/>
+          <g class="vaani-eyes">
+            <ellipse cx="98" cy="103" rx="13" ry="16"/>
+            <ellipse cx="142" cy="103" rx="13" ry="16"/>
+            <circle cx="101" cy="100" r="4"/>
+            <circle cx="145" cy="100" r="4"/>
+          </g>
+          <path class="vaani-brow" d="M84 82q14-9 28 0M128 82q14-9 28 0"/>
+          <path class="vaani-mouth" d="M106 132q14 13 28 0"/>
+          <g class="vaani-headset">
+            <path d="M72 102a48 48 0 0 1 96 0"/>
+            <rect x="60" y="99" width="16" height="35" rx="8"/>
+            <rect x="164" y="99" width="16" height="35" rx="8"/>
+            <path d="M172 130q-2 18-25 20"/>
+            <circle cx="144" cy="150" r="5"/>
+          </g>
+          <g class="vaani-dots">
+            <circle cx="104" cy="136" r="4"/>
+            <circle cx="120" cy="136" r="4"/>
+            <circle cx="136" cy="136" r="4"/>
+          </g>
+          <path class="vaani-tail" d="M91 199 76 215l2-27"/>
+        </g>
+      </svg>
+      <span class="vaani-name">Vaani</span>
       <strong id="voiceState">Ready when you are</strong>
       <p id="voiceHint">Tap once to start. After that, just speak naturally.</p>
       <div class="voice-energy" aria-hidden="true"><span id="voiceEnergy"></span></div>
@@ -225,6 +257,7 @@
   function monitorLevel() {
     const level = rmsLevel();
     energyBar.style.width = `${Math.min(100, level * 900)}%`;
+    stage.style.setProperty("--mouth-scale", String(Math.min(2.6, 0.7 + level * 15)));
     const now = performance.now();
     if (mode === "listening" && !muted) {
       if (level > 0.035) {
