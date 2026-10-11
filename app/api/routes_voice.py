@@ -40,6 +40,31 @@ class VoiceChatResponse(BaseModel):
     timings: VoiceTimings
 
 
+VOICE_CHAT_REQUEST_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["audio", "guardian_id", "student_id"],
+                    "properties": {
+                        "audio": {"type": "string", "format": "binary"},
+                        "guardian_id": {"type": "string"},
+                        "student_id": {"type": "string"},
+                        "language": {
+                            "type": "string",
+                            "enum": ["en", "hi", "te"],
+                        },
+                        "session_id": {"type": "string"},
+                    },
+                }
+            }
+        },
+    }
+}
+
+
 def _runtime(request: Request):
     runtime = getattr(request.app.state, "voice_runtime", None)
     if runtime is None:
@@ -71,7 +96,11 @@ async def voice_status(request: Request, _tenant: str = Depends(get_current_tena
     return _runtime(request).status()
 
 
-@router.post("/chat", response_model=VoiceChatResponse)
+@router.post(
+    "/chat",
+    response_model=VoiceChatResponse,
+    openapi_extra=VOICE_CHAT_REQUEST_BODY,
+)
 async def voice_chat(
     request: Request,
     tenant_id: str = Depends(get_current_tenant),

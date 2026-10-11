@@ -379,6 +379,14 @@ def test_voice_requires_valid_auth(client):
         client.headers["Authorization"] = authorization
 
 
+def test_voice_chat_openapi_describes_multipart_fields(client):
+    operation = client.get("/openapi.json").json()["paths"]["/voice/chat"]["post"]
+    schema = operation["requestBody"]["content"]["multipart/form-data"]["schema"]
+    assert schema["required"] == ["audio", "guardian_id", "student_id"]
+    assert schema["properties"]["audio"]["format"] == "binary"
+    assert schema["properties"]["language"]["enum"] == ["en", "hi", "te"]
+
+
 def test_voice_rejects_oversize_and_wrong_type_before_stt(client, monkeypatch):
     from app.config import settings
     from app.main import app
