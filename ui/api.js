@@ -104,6 +104,7 @@
       retry = false,
       responseType = "json",
       announceErrors = true,
+      signal: externalSignal,
       headers: optionHeaders = {},
       ...fetchOptions
     } = options;
@@ -120,6 +121,8 @@
     }
 
     const controller = new AbortController();
+    const abortRequest = () => controller.abort();
+    externalSignal?.addEventListener("abort", abortRequest, { once: true });
     const timer = window.setTimeout(() => controller.abort(), timeout);
     const slowTimer = window.setTimeout(() => {
       if (announceErrors) {
@@ -173,6 +176,7 @@
     } finally {
       window.clearTimeout(timer);
       window.clearTimeout(slowTimer);
+      externalSignal?.removeEventListener("abort", abortRequest);
     }
   }
 
@@ -541,7 +545,7 @@
         announceErrors: false,
       });
     },
-    async voiceChat(formData) {
+    async voiceChat(formData, signal = null) {
       await ensureAuth();
       return request("/voice/chat", {
         method: "POST",
@@ -549,6 +553,7 @@
         auth: true,
         timeout: 90000,
         announceErrors: false,
+        signal,
       });
     },
     async voiceAudio(audioId, guardianId) {

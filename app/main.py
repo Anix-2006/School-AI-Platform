@@ -18,6 +18,7 @@ UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 FLOW_PAGES = {
     "platform-overview",
     "parent-chat",
+    "voice-assistant",
     "ask-a-helper",
     "whatsapp",
     "daily-updates",
