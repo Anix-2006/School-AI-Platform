@@ -72,11 +72,26 @@
       <div class="parent-compose">
         <label class="sr-only" for="message" data-i18n="message">Message</label>
         <textarea id="message" rows="1" data-i18n-placeholder="messagePlaceholder" placeholder="Ask about your child…"></textarea>
+        <button type="button" class="voice-button" id="voiceBtn" aria-label="Record voice message" title="Record voice message" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a4 4 0 0 0 4-4V7a4 4 0 0 0-8 0v4a4 4 0 0 0 4 4Zm-7-4a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
+        </button>
         <button type="button" class="send-button" id="sendBtn" disabled>
           <span data-i18n="send">Send</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 17 8-17 8 3-8-3-8Zm3 8h14"/></svg>
         </button>
       </div>
+      <div class="voice-recorder" id="voiceRecorder" hidden>
+        <span class="recording-dot" aria-hidden="true"></span>
+        <span id="voiceTimer">0:00</span>
+        <span class="voice-level" aria-hidden="true"><span id="voiceLevel"></span></span>
+        <button type="button" class="secondary" id="cancelVoice" data-i18n="voiceCancel">Cancel</button>
+      </div>
+      <div class="voice-privacy" id="voicePrivacy" role="note" hidden>
+        <span data-i18n="voicePrivacy">Your voice is processed by AI and is not stored as audio.</span>
+        <button type="button" class="secondary" id="acceptVoicePrivacy" data-i18n="voicePrivacyContinue">Continue</button>
+      </div>
+      <p class="voice-status" id="voiceStatus" role="status" aria-live="polite" hidden></p>
+      <span class="sr-only" id="voiceAnnouncer" aria-live="assertive"></span>
       <div id="chatError" class="error retry-row" role="alert" hidden>
         <span id="chatErrorText"></span>
         <button type="button" class="secondary" id="retrySend" data-i18n="retry">Try again</button>
@@ -120,11 +135,31 @@
   const errorBox = document.getElementById("chatError");
   const errorText = document.getElementById("chatErrorText");
   const printButton = document.getElementById("printResponse");
+  const voiceButton = document.getElementById("voiceBtn");
+  const voiceRecorder = document.getElementById("voiceRecorder");
+  const voiceTimer = document.getElementById("voiceTimer");
+  const voiceLevel = document.getElementById("voiceLevel");
+  const voiceStatus = document.getElementById("voiceStatus");
+  const voicePrivacy = document.getElementById("voicePrivacy");
+  const voiceAnnouncer = document.getElementById("voiceAnnouncer");
   let contexts = [];
   let waiting = false;
   let sessionId = makeSessionId();
   let lastMessage = "";
   let rankRequested = false;
+  let mediaRecorder = null;
+  let mediaStream = null;
+  let audioContext = null;
+  let analyserFrame = 0;
+  let recordingTimer = 0;
+  let recordingStarted = 0;
+  let recordedChunks = [];
+  let recordingCancelled = false;
+  let voiceRequestActive = false;
+  let voiceStatusRetry = 0;
+  let voiceGeneration = 0;
+  const activeAudio = new Set();
+  const PRIVACY_KEY = "school.voicePrivacySeen";
 
   function makeSessionId() {
     return `parent-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -173,7 +208,414 @@
     return article;
   }
 
+  function announceVoice(key) {
+    voiceAnnouncer.textContent = "";
+    window.requestAnimationFrame(() => {
+      voiceAnnouncer.textContent = SchoolAPI.t(key, currentLanguage());
+    });
+  }
+
+  function setVoiceStatus(key, announce = false) {
+    voiceStatus.hidden = !key;
+    voiceStatus.dataset.messageKey = key || "";
+    voiceStatus.textContent = key ? SchoolAPI.t(key, currentLanguage()) : "";
+    if (announce && key) announceVoice(key);
+  }
+
+  function storageHasPrivacyNotice() {
+    try {
+      return sessionStorage.getItem(PRIVACY_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function rememberPrivacyNotice() {
+    try {
+      sessionStorage.setItem(PRIVACY_KEY, "1");
+    } catch {
+      // Voice remains usable when session storage is unavailable.
+    }
+  }
+
+  function voiceSupported() {
+    return Boolean(
+      navigator.mediaDevices?.getUserMedia &&
+      window.MediaRecorder &&
+      typeof MediaRecorder.isTypeSupported === "function"
+    );
+  }
+
+  function preferredMimeType() {
+    return [
+      "audio/webm;codecs=opus",
+      "audio/ogg;codecs=opus",
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/aac",
+      "audio/mp4",
+    ].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+  }
+
+  async function checkVoiceStatus() {
+    window.clearTimeout(voiceStatusRetry);
+    try {
+      const result = await SchoolAPI.voiceStatus();
+      if (!voiceSupported()) {
+        voiceButton.hidden = true;
+        setVoiceStatus("voiceUnavailable");
+        return;
+      }
+      if (result?.status === "ready") {
+        voiceButton.hidden = false;
+        setVoiceStatus("");
+        return;
+      }
+      voiceButton.hidden = true;
+      setVoiceStatus("voiceWarming");
+      voiceStatusRetry = window.setTimeout(checkVoiceStatus, 5000);
+    } catch (error) {
+      voiceButton.hidden = true;
+      if (error.status === 404) {
+        setVoiceStatus("");
+      } else {
+        setVoiceStatus(error.status === 0 ? "voiceOffline" : "voiceWarming");
+        voiceStatusRetry = window.setTimeout(checkVoiceStatus, 7000);
+      }
+    }
+  }
+
+  function releaseCapture() {
+    window.clearInterval(recordingTimer);
+    window.cancelAnimationFrame(analyserFrame);
+    recordingTimer = 0;
+    analyserFrame = 0;
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      mediaStream = null;
+    }
+    if (audioContext) {
+      audioContext.close().catch(() => {});
+      audioContext = null;
+    }
+    voiceRecorder.hidden = true;
+    voiceLevel.style.width = "0%";
+    voiceButton.classList.remove("recording");
+    voiceButton.setAttribute("aria-label", SchoolAPI.t("voiceRecord", currentLanguage()));
+    voiceButton.title = SchoolAPI.t("voiceRecord", currentLanguage());
+  }
+
+  function releaseAudio() {
+    activeAudio.forEach((item) => {
+      item.audio.pause();
+      item.audio.removeAttribute("src");
+      item.audio.load();
+      if (item.url) URL.revokeObjectURL(item.url);
+    });
+    activeAudio.clear();
+  }
+
+  function stopVoiceWork(preserveStatusRetry = false) {
+    voiceGeneration += 1;
+    if (!preserveStatusRetry) {
+      window.clearTimeout(voiceStatusRetry);
+      voiceStatusRetry = 0;
+    }
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      recordingCancelled = true;
+      mediaRecorder.stop();
+    }
+    releaseCapture();
+    releaseAudio();
+    voicePrivacy.hidden = true;
+  }
+
+  function showRecordingLevel() {
+    if (!audioContext || !mediaStream) return;
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    audioContext.createMediaStreamSource(mediaStream).connect(analyser);
+    const values = new Uint8Array(analyser.frequencyBinCount);
+    const draw = () => {
+      analyser.getByteFrequencyData(values);
+      const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+      voiceLevel.style.width = `${Math.min(100, Math.max(4, average * 1.5))}%`;
+      analyserFrame = window.requestAnimationFrame(draw);
+    };
+    draw();
+  }
+
+  function updateRecordingTimer() {
+    const elapsed = Math.min(30, Math.floor((Date.now() - recordingStarted) / 1000));
+    voiceTimer.textContent = `0:${String(elapsed).padStart(2, "0")}`;
+    if (elapsed >= 30 && mediaRecorder?.state === "recording") stopRecording();
+  }
+
+  function microphoneErrorKey(error) {
+    if (!navigator.onLine) return "voiceOffline";
+    if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return "voicePermission";
+    if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") return "voiceNoDevice";
+    return "voiceUnavailable";
+  }
+
+  async function startRecording() {
+    if (voiceRequestActive || mediaRecorder?.state === "recording") return;
+    voicePrivacy.hidden = true;
+    if (!navigator.onLine) {
+      setVoiceStatus("voiceOffline", true);
+      return;
+    }
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = preferredMimeType();
+      mediaRecorder = mimeType
+        ? new MediaRecorder(mediaStream, { mimeType })
+        : new MediaRecorder(mediaStream);
+      recordedChunks = [];
+      recordingCancelled = false;
+      mediaRecorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size) recordedChunks.push(event.data);
+      });
+      mediaRecorder.addEventListener("stop", finishRecording, { once: true });
+      mediaRecorder.start();
+      recordingStarted = Date.now();
+      voiceRecorder.hidden = false;
+      voiceButton.classList.add("recording");
+      voiceButton.setAttribute("aria-label", SchoolAPI.t("voiceStop", currentLanguage()));
+      voiceButton.title = SchoolAPI.t("voiceStop", currentLanguage());
+      setVoiceStatus("voiceRecording", true);
+      updateRecordingTimer();
+      recordingTimer = window.setInterval(updateRecordingTimer, 250);
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioContext = new AudioContextClass();
+        showRecordingLevel();
+      }
+    } catch (error) {
+      releaseCapture();
+      setVoiceStatus(microphoneErrorKey(error), true);
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder?.state !== "recording") return;
+    recordingCancelled = false;
+    mediaRecorder.stop();
+  }
+
+  function cancelRecording() {
+    if (mediaRecorder?.state !== "recording") return;
+    recordingCancelled = true;
+    mediaRecorder.stop();
+  }
+
+  function voiceErrorKey(error) {
+    if (!navigator.onLine || error.status === 0) return "voiceOffline";
+    if (error.status === 403) return "voiceNoConsent";
+    if (error.status === 429) return "voiceBusy";
+    if (error.status === 400 || error.status === 413 || error.status === 415 || error.status === 422) {
+      return "voiceUnclear";
+    }
+    if (error.status === 503) return "voiceWarming";
+    return "voiceUploadError";
+  }
+
+  function addTranscriptEdit(bubble, transcript) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "bubble-action";
+    button.dataset.i18n = "voiceEditTranscript";
+    button.textContent = SchoolAPI.t("voiceEditTranscript", currentLanguage());
+    button.addEventListener("click", () => {
+      input.value = transcript;
+      updateSendState();
+      input.focus();
+    });
+    bubble.appendChild(button);
+  }
+
+  async function getReplayAudio(item, reply, language) {
+    if (item.url) return true;
+    try {
+      setVoiceStatus("voiceSpeaking");
+      const blob = await SchoolAPI.voiceSpeak(reply, language);
+      item.url = URL.createObjectURL(blob);
+      item.audio.src = item.url;
+      return true;
+    } catch {
+      setVoiceStatus("voiceAudioError", true);
+      return false;
+    }
+  }
+
+  function addAudioControls(bubble, blob, reply, language) {
+    const controls = document.createElement("div");
+    controls.className = "voice-playback";
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "secondary voice-play";
+    play.dataset.i18n = "voicePlay";
+    play.textContent = SchoolAPI.t("voicePlay", currentLanguage());
+    const replay = document.createElement("button");
+    replay.type = "button";
+    replay.className = "secondary voice-replay";
+    replay.dataset.i18n = "voiceReplay";
+    replay.textContent = SchoolAPI.t("voiceReplay", currentLanguage());
+    const progressLabel = document.createElement("label");
+    progressLabel.className = "sr-only";
+    progressLabel.textContent = SchoolAPI.t("voiceProgress", currentLanguage());
+    const progress = document.createElement("input");
+    progress.type = "range";
+    progress.min = "0";
+    progress.max = "100";
+    progress.value = "0";
+    progress.setAttribute("aria-label", SchoolAPI.t("voiceProgress", currentLanguage()));
+    const audio = new Audio();
+    const item = { audio, url: blob ? URL.createObjectURL(blob) : "" };
+    if (item.url) audio.src = item.url;
+    audio.preload = "metadata";
+    activeAudio.add(item);
+    const updatePlayLabel = () => {
+      const key = audio.paused ? "voicePlay" : "voicePause";
+      play.dataset.i18n = key;
+      play.textContent = SchoolAPI.t(key, currentLanguage());
+    };
+    play.addEventListener("click", async () => {
+      if (!audio.paused) {
+        audio.pause();
+        return;
+      }
+      if (await getReplayAudio(item, reply, language)) {
+        audio.play().catch(() => setVoiceStatus("voiceAudioError", true));
+      }
+    });
+    replay.addEventListener("click", async () => {
+      if (!(await getReplayAudio(item, reply, language))) return;
+      audio.currentTime = 0;
+      audio.play().catch(() => setVoiceStatus("voiceAudioError", true));
+    });
+    progress.addEventListener("input", () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = audio.duration * (Number(progress.value) / 100);
+      }
+    });
+    audio.addEventListener("play", updatePlayLabel);
+    audio.addEventListener("pause", updatePlayLabel);
+    audio.addEventListener("timeupdate", () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        progress.value = String((audio.currentTime / audio.duration) * 100);
+      }
+    });
+    audio.addEventListener("ended", () => {
+      progress.value = "100";
+      updatePlayLabel();
+      if (item.url) {
+        URL.revokeObjectURL(item.url);
+        item.url = "";
+        audio.removeAttribute("src");
+      }
+    });
+    audio.addEventListener("error", () => {
+      if (item.url) {
+        URL.revokeObjectURL(item.url);
+        item.url = "";
+      }
+      setVoiceStatus("voiceAudioError", true);
+    });
+    controls.append(play, replay, progressLabel, progress);
+    bubble.appendChild(controls);
+  }
+
+  async function attachVoiceAudio(bubble, data, guardianId, generation) {
+    if (!data.audio_id) {
+      addAudioControls(bubble, null, data.reply || "", data.language || currentLanguage());
+      setVoiceStatus("voiceAudioError", true);
+      return;
+    }
+    if (guardianSelect.value !== guardianId || generation !== voiceGeneration) return;
+    try {
+      const blob = await SchoolAPI.voiceAudio(data.audio_id, guardianId);
+      if (guardianSelect.value !== guardianId || generation !== voiceGeneration) return;
+      addAudioControls(bubble, blob, data.reply || "", data.language || currentLanguage());
+      setVoiceStatus("voiceReady", true);
+    } catch {
+      if (generation === voiceGeneration) {
+        addAudioControls(bubble, null, data.reply || "", data.language || currentLanguage());
+        setVoiceStatus("voiceAudioError", true);
+      }
+    }
+  }
+
+  async function uploadVoice(blob, userBubble) {
+    const context = currentContext();
+    if (!context) return;
+    const generation = voiceGeneration;
+    const guardianId = String(context.id);
+    const form = new FormData();
+    form.append("audio", blob, "voice");
+    form.append("guardian_id", guardianId);
+    form.append("student_id", String(context.student_id));
+    form.append("language", currentLanguage());
+    form.append("session_id", sessionId);
+    voiceRequestActive = true;
+    voiceButton.disabled = true;
+    typing.hidden = false;
+    setVoiceStatus("voiceUploading", true);
+    const transcribingTimer = window.setTimeout(() => setVoiceStatus("voiceTranscribing", true), 1200);
+    const thinkingTimer = window.setTimeout(() => setVoiceStatus("voiceThinking", true), 7000);
+    try {
+      const data = await SchoolAPI.voiceChat(form);
+      if (generation !== voiceGeneration) return;
+      userBubble.querySelector("p").textContent = data.transcript || SchoolAPI.t("voiceUnclear", currentLanguage());
+      addTranscriptEdit(userBubble, data.transcript || "");
+      const replyBubble = addBubble(data.reply || "", "bot", data.agent_used);
+      setVoiceStatus("voiceSpeaking");
+      await attachVoiceAudio(replyBubble, data, guardianId, generation);
+    } catch (error) {
+      if (generation !== voiceGeneration) return;
+      userBubble.remove();
+      setVoiceStatus(voiceErrorKey(error), true);
+      if (error.status === 503) checkVoiceStatus();
+    } finally {
+      window.clearTimeout(transcribingTimer);
+      window.clearTimeout(thinkingTimer);
+      voiceRequestActive = false;
+      voiceButton.disabled = false;
+      typing.hidden = true;
+    }
+  }
+
+  function finishRecording() {
+    const cancelled = recordingCancelled;
+    const recorderType = mediaRecorder?.mimeType || "";
+    const chunks = recordedChunks.slice();
+    mediaRecorder = null;
+    recordedChunks = [];
+    releaseCapture();
+    if (cancelled || !chunks.length) {
+      setVoiceStatus("");
+      return;
+    }
+    const actualType = chunks[0].type || recorderType || "application/octet-stream";
+    const blob = new Blob(chunks, { type: actualType });
+    const userBubble = addBubble(SchoolAPI.t("voiceListening", currentLanguage()), "user");
+    uploadVoice(blob, userBubble);
+  }
+
+  function handleVoiceTap() {
+    if (mediaRecorder?.state === "recording") {
+      stopRecording();
+      return;
+    }
+    if (!storageHasPrivacyNotice()) {
+      voicePrivacy.hidden = false;
+      document.getElementById("acceptVoicePrivacy").focus();
+      return;
+    }
+    startRecording();
+  }
+
   function resetConversation() {
+    stopVoiceWork(true);
     sessionId = makeSessionId();
     rankRequested = false;
     printButton.hidden = true;
@@ -294,6 +736,15 @@
       document.getElementById("consentMeta").textContent =
         context.has_consent ? "" : SchoolAPI.t("noConsent", currentLanguage());
     }
+    const voiceKey = mediaRecorder?.state === "recording" ? "voiceStop" : "voiceRecord";
+    voiceButton.setAttribute("aria-label", SchoolAPI.t(voiceKey, currentLanguage()));
+    voiceButton.title = SchoolAPI.t(voiceKey, currentLanguage());
+    if (voiceStatus.dataset.messageKey) {
+      voiceStatus.textContent = SchoolAPI.t(voiceStatus.dataset.messageKey, currentLanguage());
+    }
+    document.querySelectorAll(".voice-playback input[type='range']").forEach((control) => {
+      control.setAttribute("aria-label", SchoolAPI.t("voiceProgress", currentLanguage()));
+    });
     updateSendState();
   }
 
@@ -305,6 +756,13 @@
     }
   });
   sendButton.addEventListener("click", sendMessage);
+  voiceButton.addEventListener("click", handleVoiceTap);
+  document.getElementById("cancelVoice").addEventListener("click", cancelRecording);
+  document.getElementById("acceptVoicePrivacy").addEventListener("click", () => {
+    rememberPrivacyNotice();
+    voicePrivacy.hidden = true;
+    startRecording();
+  });
   document.getElementById("retrySend").addEventListener("click", () => {
     input.value = lastMessage;
     updateSendState();
@@ -312,7 +770,11 @@
   });
   document.getElementById("newConversation").addEventListener("click", resetConversation);
   printButton.addEventListener("click", () => window.print());
-  guardianSelect.addEventListener("change", renderContext);
+  guardianSelect.addEventListener("change", () => {
+    stopVoiceWork();
+    renderContext();
+    checkVoiceStatus();
+  });
   languageSelect.addEventListener("change", () => {
     applyLanguage();
     resetConversation();
@@ -351,11 +813,13 @@
       experience.hidden = false;
       applyLanguage();
       renderContext();
+      checkVoiceStatus();
     })
     .catch((error) => {
       pageState.className = "state state-error";
       pageState.textContent = error.message;
     });
+  window.addEventListener("pagehide", stopVoiceWork);
 })();
 </script>
 </body>
