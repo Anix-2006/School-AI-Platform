@@ -3,3 +3,5 @@ RUNNING.md
 school_ai_platform_flow.html
 __pycache__
 ~$*.xlsx
+.env
+venv/
