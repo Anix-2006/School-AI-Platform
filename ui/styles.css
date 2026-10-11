@@ -3725,3 +3725,16 @@ button.secondary:hover {
     padding-top: 28px;
   }
 }
+
+@media (min-width: 1024px) {
+  body > main.voice-mode-page {
+    width: min(calc(100% - var(--desktop-sidebar-width) - 80px), 48rem);
+    max-width: 48rem;
+    margin-right: 0;
+    margin-left: calc(
+      var(--desktop-sidebar-width) +
+      max(40px, (100vw - var(--desktop-sidebar-width) - 48rem) / 2)
+    );
+    padding-top: 28px;
+  }
+}

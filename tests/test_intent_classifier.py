@@ -49,12 +49,15 @@ def _route(monkeypatch, classifier, llm_reply="communication", messages=None):
 
 def test_confident_classifier_skips_llm(monkeypatch):
     result, llm = _route(monkeypatch, FakeClassifier("academic", 0.93))
-    assert result == {
+    assert {key: result[key] for key in (
+        "route_to", "intent", "intent_source", "intent_confidence"
+    )} == {
         "route_to": "academic",
         "intent": "academic",
         "intent_source": "classifier",
         "intent_confidence": 0.93,
     }
+    assert result["router_ms"] >= 0
     assert not llm.called
 
 

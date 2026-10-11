@@ -4,8 +4,10 @@ Requires OPENAI_API_KEY to be set - this hits the real router LLM call."""
 import os
 import pytest
 
+_api_key = os.getenv("OPENAI_API_KEY", "")
 pytestmark = pytest.mark.skipif(
-    not os.getenv("OPENAI_API_KEY"), reason="requires OPENAI_API_KEY"
+    not _api_key or _api_key.startswith(("test-", "sk-...")),
+    reason="requires a real OPENAI_API_KEY",
 )
 
 

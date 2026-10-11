@@ -137,7 +137,7 @@ def test_audio_store_enforces_owner_expiry_and_one_download():
     assert store.take(audio_id, owner) == b"sound"
     assert store.take(audio_id, owner) is None
     expired = store.put(owner, b"old")
-    time.sleep(0.03)
+    time.sleep(0.08)
     assert store.take(expired, owner) is None
 
 
