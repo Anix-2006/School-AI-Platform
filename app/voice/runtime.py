@@ -5,7 +5,7 @@ import logging
 
 from app.config import settings
 from app.voice.service import VoiceService
-from app.voice.stt import FasterWhisperEngine
+from app.voice.stt import FasterWhisperEngine, shutdown_whisper_executor
 from app.voice.storage import AudioStore
 from app.voice.tts import GttsEngine
 
@@ -61,3 +61,4 @@ class VoiceRuntime:
     def close(self) -> None:
         if self.service is not None:
             self.service.close()
+        shutdown_whisper_executor()

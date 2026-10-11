@@ -9,7 +9,7 @@ from collections import defaultdict, deque
 
 from app.services.chat_service import run_parent_turn
 from app.voice.speech_text import clean_for_speech
-from app.voice.stt import SttEngine, Transcript
+from app.voice.stt import SttEngine, Transcript, transcribe_async
 from app.voice.storage import AudioStore
 from app.voice.tts import TtsEngine
 
@@ -95,8 +95,8 @@ class VoiceService:
         queued = time.perf_counter()
         try:
             prompt = _initial_prompt(student)
-            transcript = await asyncio.to_thread(
-                self.stt.transcribe, audio, content_type, None, prompt
+            transcript = await transcribe_async(
+                self.stt, audio, content_type, None, prompt
             )
             transcribed = time.perf_counter()
             reply_language = choose_reply_language(transcript)
