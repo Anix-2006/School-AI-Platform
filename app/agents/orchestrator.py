@@ -8,6 +8,8 @@ otherwise from the LLM router. The insight agent is not routed here - it
 runs as a batch job (app/tasks/daily_batch.py)."""
 
 import logging
+import re
+import time
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
@@ -29,13 +31,12 @@ intent_classifier = IntentClassifier.load()
 
 # Route definitions double as the labeling guide for data/intent/*.jsonl.
 ROUTER_PROMPT = """Classify the parent's latest message into exactly one route.
-Parents write in English, Hindi, Hinglish (romanized Hindi), or Telugu.
+Parents write in English, Hindi, or Hinglish (romanized Hindi).
 
 - "daily_update" - a specific day at school: attendance, being late or
   leaving early, homework, diary notes, care log (nap, meals, mood),
   today's class activity.
-  e.g. "Was my child present today?", "Aaj ka homework kya hai?",
-  "ఈరోజు హోంవర్క్ ఏమిటి?"
+  e.g. "Was my child present today?", "Aaj ka homework kya hai?"
 - "academic" - results and progress: marks, test/FA/SA scores, rank card,
   report card, syllabus progress or chapters completed, developmental
   milestones, whether performance is improving or dropping.
@@ -80,7 +81,18 @@ def _llm_route(state: AgentState) -> str:
 
 
 def router_node(state: AgentState) -> dict:
+    started = time.perf_counter()
     text = _latest_user_text(state["messages"])
+    if state.get("channel") == "voice":
+        keyword_route = _voice_keyword_route(text)
+        if keyword_route:
+            return {
+                "route_to": keyword_route,
+                "intent": keyword_route,
+                "intent_source": "keyword",
+                "intent_confidence": 1.0,
+                "router_ms": round((time.perf_counter() - started) * 1000),
+            }
     if intent_classifier is not None and text:
         try:
             prediction = intent_classifier.predict(text)
@@ -96,10 +108,50 @@ def router_node(state: AgentState) -> dict:
                     "intent": prediction.intent,
                     "intent_source": "classifier",
                     "intent_confidence": prediction.confidence,
+                    "router_ms": round((time.perf_counter() - started) * 1000),
                 }
 
     route = _llm_route(state)
-    return {"route_to": route, "intent": route, "intent_source": "llm", "intent_confidence": None}
+    return {
+        "route_to": route,
+        "intent": route,
+        "intent_source": "llm",
+        "intent_confidence": None,
+        "router_ms": round((time.perf_counter() - started) * 1000),
+    }
+
+
+_VOICE_ROUTES = (
+    ("daily_update", re.compile(
+        r"\b(attendance|present|absent|late|homework|diary|आज|उपस्थिति|हाज़िर|गृहकार्य|होमवर्क)\b",
+        re.IGNORECASE,
+    )),
+    ("academic", re.compile(
+        r"\b(mark|marks|score|rank|rank card|syllabus|chapter|fa\s*\d|sa\s*\d|"
+        r"अंक|रैंक|पाठ्यक्रम|सिलेबस|अध्याय)\b",
+        re.IGNORECASE,
+    )),
+)
+
+
+def _voice_keyword_route(text: str) -> str | None:
+    """Skip the router model only for unambiguous English/Hindi school intents."""
+    for route, pattern in _VOICE_ROUTES:
+        if pattern.search(text):
+            return route
+    return None
+
+
+def _timed_agent(node):
+    def run(state: AgentState) -> dict:
+        started = time.perf_counter()
+        result = node(state)
+        return {
+            **result,
+            "agent_llm_ms": round((time.perf_counter() - started) * 1000),
+        }
+
+    return run
 
 
 def route_decision(state: AgentState) -> str:
@@ -110,10 +162,10 @@ def build_graph():
     graph = StateGraph(AgentState)
 
     graph.add_node("router", router_node)
-    graph.add_node("daily_update", daily_update_node)
-    graph.add_node("academic", academic_node)
-    graph.add_node("communication", communication_node)
-    graph.add_node("parent_teacher", parent_teacher_node)
+    graph.add_node("daily_update", _timed_agent(daily_update_node))
+    graph.add_node("academic", _timed_agent(academic_node))
+    graph.add_node("communication", _timed_agent(communication_node))
+    graph.add_node("parent_teacher", _timed_agent(parent_teacher_node))
 
     graph.set_entry_point("router")
     graph.add_conditional_edges("router", route_decision, ROUTE_TO_NODE)

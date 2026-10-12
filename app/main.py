@@ -1,13 +1,16 @@
 from pathlib import Path
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 import logging
 
-from app.api import routes_chat, routes_students, routes_webhooks, routes_ops, routes_teachers
+from app.api import routes_chat, routes_students, routes_webhooks, routes_ops, routes_teachers, routes_voice
 from app.core.security import create_access_token
 from app.services.excel_store import get_store
+from app.voice.runtime import VoiceRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +18,7 @@ UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 FLOW_PAGES = {
     "platform-overview",
     "parent-chat",
+    "voice-assistant",
     "ask-a-helper",
     "whatsapp",
     "daily-updates",
@@ -24,21 +28,44 @@ FLOW_PAGES = {
     "teacher-workspace",
 }
 
-app = FastAPI(title="School Parent AI Platform")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    store = get_store()
+    store.ensure_columns("messages", ["student_id", "intent_source", "intent_confidence"])
+    logger.info("Using %s (school: %s)", store.path, store.default_tenant_id())
+
+    runtime = getattr(app.state, "voice_runtime", None)
+    if runtime is None:
+        runtime = VoiceRuntime()
+        app.state.voice_runtime = runtime
+    task = None
+    warm = getattr(runtime, "warm", None)
+    if warm is not None and runtime.state == "warming":
+        task = asyncio.create_task(warm(), name="voice-runtime-warm")
+        app.state.voice_warm_task = task
+    try:
+        yield
+    finally:
+        if task is not None:
+            if not task.done():
+                task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+        close = getattr(runtime, "close", None)
+        if close is not None:
+            close()
+        app.state.voice_warm_task = None
+
+
+app = FastAPI(title="School Parent AI Platform", lifespan=lifespan)
 
 app.include_router(routes_chat.router)
 app.include_router(routes_students.router)
 app.include_router(routes_webhooks.router)
 app.include_router(routes_ops.router)
 app.include_router(routes_teachers.router)
-
-
-@app.on_event("startup")
-def check_workbook():
-    """Fail fast if the workbook is missing or has no school in it."""
-    store = get_store()
-    store.ensure_columns("messages", ["student_id", "intent_source", "intent_confidence"])
-    logger.info("Using %s (school: %s)", store.path, store.default_tenant_id())
+app.include_router(routes_voice.router)
 
 
 @app.get("/")
@@ -65,6 +92,13 @@ def ui_api_js():
 @app.get("/nav.js")
 def ui_nav_js():
     return FileResponse(UI_DIR / "nav.js", media_type="application/javascript")
+
+
+@app.get("/voice-mascot-{size}.png")
+def voice_mascot(size: int):
+    if size not in {32, 512}:
+        raise HTTPException(status_code=404, detail="Mascot size not found")
+    return FileResponse(UI_DIR / "assets" / f"vaani-{size}.png", media_type="image/png")
 
 
 @app.get("/flows/{page}")

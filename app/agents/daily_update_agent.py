@@ -8,6 +8,7 @@ from app.agents.language import language_name
 from app.agents.state import AgentState
 from app.agents.tools import DAILY_UPDATE_TOOLS
 from app.agents.tool_loop import run_tool_loop
+from app.agents.voice_prompt import voice_prompt
 
 # Fast/cheap model - this agent handles high-volume, low-complexity daily
 # pushes (attendance + diary summaries). Don't burn the strong model here.
@@ -39,5 +40,5 @@ def daily_update_node(state: AgentState) -> dict:
         student_id=state.get("student_id") or "unknown",
         today=date.today().isoformat(),
     )
-    messages = [SystemMessage(content=prompt)] + state["messages"]
+    messages = [SystemMessage(content=prompt + voice_prompt(state))] + state["messages"]
     return run_tool_loop(llm, messages, DAILY_UPDATE_TOOLS)

@@ -39,6 +39,24 @@ def resolve_parent(tenant_id: str, guardian_id: str, student_id: str | None = No
     return guardian, student
 
 
+def handle_parent_message(
+    tenant_id: str,
+    guardian_id: str,
+    message: str,
+    *,
+    student_id: str | None = None,
+    session_id: str | None = None,
+    channel: str,
+    language_override: str | None = None,
+) -> dict:
+    """Resolve a parent and run one message through the orchestrator."""
+    guardian, student = resolve_parent(tenant_id, guardian_id, student_id)
+    thread_id = f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
+    return run_parent_turn(
+        tenant_id, guardian, student, message, channel, thread_id, language_override
+    )
+
+
 def run_parent_turn(
     tenant_id: str,
     guardian: dict,
@@ -46,17 +64,22 @@ def run_parent_turn(
     message: str,
     channel: str,
     thread_id: str,
+    language_override: str | None = None,
 ) -> dict:
-    language = guardian.get("preferred_language") or "en"
+    language = language_override or guardian.get("preferred_language") or "en"
     state = {
         "messages": [HumanMessage(content=message)],
         "tenant_id": tenant_id,
         "student_id": student["id"],
         "guardian_id": guardian["id"],
         "language": language,
+        "reply_language": language if channel == "voice" else None,
         "age_tier": student.get("age_tier"),
+        "channel": "voice" if channel == "voice" else "chat",
         "intent": None,
         "route_to": None,
+        "router_ms": None,
+        "agent_llm_ms": None,
     }
     result = orchestrator_graph.invoke(state, config={"configurable": {"thread_id": thread_id}})
     reply = extract_text_reply(result["messages"])
@@ -77,6 +100,8 @@ def run_parent_turn(
         "agent_used": agent,
         "intent_source": result.get("intent_source"),
         "intent_confidence": result.get("intent_confidence"),
+        "router_ms": result.get("router_ms", 0),
+        "agent_llm_ms": result.get("agent_llm_ms", 0),
         "student_id": student["id"],
         "language": language,
     }
