@@ -5,3 +5,5 @@ __pycache__
 ~$*.xlsx
 data/exports/
 venv/
+.venv/
+models/whisper/

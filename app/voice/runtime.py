@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from app.config import settings
+from app.services.excel_store import resolve_path
 from app.voice.service import VoiceService
 from app.voice.stt import FasterWhisperEngine
 from app.voice.storage import AudioStore
@@ -27,10 +28,14 @@ class VoiceRuntime:
                 return
             self.state = "warming"
             try:
+                # Startup only loads a model already fetched by
+                # `python -m app.voice.download_model`; it never downloads.
                 stt = FasterWhisperEngine(
                     settings.whisper_model,
                     device=settings.whisper_device,
                     compute_type=settings.whisper_compute_type,
+                    download_root=str(resolve_path(settings.whisper_model_dir)),
+                    local_files_only=True,
                 )
                 await asyncio.to_thread(stt.warmup)
                 tts = GttsEngine(

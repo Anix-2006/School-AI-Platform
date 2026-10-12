@@ -32,8 +32,11 @@ voice model, limits, and audio cache in one process. Close
 `.env.example` lists every setting read by `app/config.py`. Voice defaults are:
 
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
-- `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
+- `WHISPER_MODEL=small`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
+- `WHISPER_MODEL_DIR=models/whisper`: where
+  `python -m app.voice.download_model` stores the model and where the app
+  loads it from (see **Voice setup** in [README.md](README.md)).
 - `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
 - `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
@@ -53,9 +56,10 @@ Restart the service after changing environment variables.
 
 ## Voice startup and browser requirements
 
-When voice is enabled, the API starts immediately and downloads/loads Whisper
-in a background startup task. `/voice/status` reports `warming` until it is
-ready. The first voice request never performs model loading: it receives 503
+When voice is enabled, the API starts immediately and loads Whisper from
+`WHISPER_MODEL_DIR` in a background startup task. It never downloads the model;
+run `python -m app.voice.download_model` first, otherwise `/voice/status`
+reports `error`. `/voice/status` reports `warming` until the model is ready. The first voice request never performs model loading: it receives 503
 while warming. Text chat remains available.
 
 Microphone capture requires a secure browser context. Browsers make an
@@ -110,7 +114,10 @@ Use a native Python web service connected to this repository:
 
 - Runtime: Python 3.11 (set Render's `PYTHON_VERSION` to a currently supported
   3.11 patch if the service does not already use 3.11).
-- Build command: `python -m pip install -r requirements.txt`
+- Build command:
+  `python -m pip install -r requirements.txt && python -m app.voice.download_model`
+  (the download step needs the voice settings below and `OPENAI_API_KEY` to be
+  available at build time).
 - Start command:
   `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1`
 - Add all required values from `.env.example` in Render's environment UI.
@@ -118,9 +125,10 @@ Use a native Python web service connected to this repository:
 - Keep `SCHOOL_DATA_PATH=data/school_data.xlsx`. This remains the existing
   single-worker, workbook-based demo service.
 
-For Render's 512 MB free plan, start with
+For Render's 512 MB free plan, set
 `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and `WHISPER_DEVICE=cpu`
-until memory is measured on that service. Reserve `base` for local/paid
+explicitly (the code default is now `small`) until memory is measured on that
+service. Reserve `base` for local/paid
 instances unless a deployed measurement proves it fits.
 
 Local Windows/Python 3.11 measurements on 11 October 2026, using the full
@@ -134,16 +142,10 @@ These are local measurements, not Render measurements. `base` leaves too
 little safety margin on a 512 MB instance, so `tiny` remains the recommended
 free-plan model until the deployed service is measured directly.
 
-The Dockerfile prefetches its `WHISPER_MODEL` build argument (default `tiny`)
-into the image. Native Render builds that only run `pip install` still
-download during background application startup; `/voice/status` remains
-`warming` meanwhile. A native build can prefetch explicitly:
-
-```bash
-python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', device='cpu', compute_type='int8')"
-```
-
-Keep build/runtime model names identical.
+Neither the Dockerfile nor application startup downloads the model. The build
+command above stores it under `WHISPER_MODEL_DIR`; a build that only runs
+`pip install` leaves voice in the `error` state. Keep build/runtime model
+names and `WHISPER_MODEL_DIR` identical.
 
 After deploy, use the API and UI checks above with
 `$base = "https://YOUR-SERVICE.onrender.com"`. HTTPS is required for the remote
@@ -177,7 +179,7 @@ secrets, consent/audit controls, and a durable database.
 - Model size is constrained by instance memory.
 - Whisper, TTS cache, rate limits, and generated audio storage are
   process-local.
-- Cold starts can include both Render startup and a model download/load.
+- Cold starts include both Render startup and loading the model from disk.
 
 Render memory, multilingual accuracy, and representative end-to-end latency
 have not been measured. Only the local memory and silence-pipeline figures

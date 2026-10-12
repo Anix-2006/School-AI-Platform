@@ -27,9 +27,12 @@ class Settings(BaseSettings):
     default_teacher_id: str = ""
 
     voice_enabled: bool = False
-    whisper_model: str = "tiny"
-    whisper_compute_type: str = "int8"
+    whisper_model: str = "small"
     whisper_device: str = "cpu"
+    whisper_compute_type: str = "int8"
+    # Relative paths resolve from the repository root (/app in Docker).
+    # Fill it once with `python -m app.voice.download_model`.
+    whisper_model_dir: str = "models/whisper"
     voice_max_concurrency: int = 1
     voice_max_seconds: float = 30
     voice_max_bytes: int = 5_242_880

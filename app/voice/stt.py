@@ -31,10 +31,19 @@ class SttEngine(Protocol):
 class FasterWhisperEngine:
     """Lazy import with one model instance per runtime."""
 
-    def __init__(self, model_name: str, device: str = "cpu", compute_type: str = "int8"):
+    def __init__(
+        self,
+        model_name: str,
+        device: str = "cpu",
+        compute_type: str = "int8",
+        download_root: str | None = None,
+        local_files_only: bool = False,
+    ):
         self.model_name = model_name
         self.device = device
         self.compute_type = compute_type
+        self.download_root = download_root
+        self.local_files_only = local_files_only
         self._model = None
         self._load_lock = threading.Lock()
 
@@ -45,9 +54,21 @@ class FasterWhisperEngine:
             if self._model is None:
                 from faster_whisper import WhisperModel
 
-                self._model = WhisperModel(
-                    self.model_name, device=self.device, compute_type=self.compute_type
-                )
+                try:
+                    self._model = WhisperModel(
+                        self.model_name,
+                        device=self.device,
+                        compute_type=self.compute_type,
+                        download_root=self.download_root,
+                        local_files_only=self.local_files_only,
+                    )
+                except FileNotFoundError as exc:
+                    if not self.local_files_only:
+                        raise
+                    raise RuntimeError(
+                        f"Whisper model '{self.model_name}' is not downloaded in "
+                        f"{self.download_root}. Run: python -m app.voice.download_model"
+                    ) from exc
 
     def warmup(self) -> None:
         """Run one silent second at startup so the first parent does not pay setup cost."""
