@@ -61,7 +61,17 @@ def run_parent_turn(
     result = orchestrator_graph.invoke(state, config={"configurable": {"thread_id": thread_id}})
     reply = extract_text_reply(result["messages"])
     agent = result.get("route_to")
-    log_turn(tenant_id, guardian["id"], channel, message, reply, agent)
+    log_turn(
+        tenant_id,
+        guardian["id"],
+        channel,
+        message,
+        reply,
+        agent,
+        student_id=student["id"],
+        intent_source=result.get("intent_source"),
+        intent_confidence=result.get("intent_confidence"),
+    )
     return {
         "reply": reply,
         "agent_used": agent,
@@ -72,13 +82,37 @@ def run_parent_turn(
     }
 
 
-def log_turn(tenant_id: str, guardian_id: str, channel: str, message: str, reply: str, agent: str | None) -> None:
+MESSAGE_META_COLUMNS = ("student_id", "intent_source", "intent_confidence")
+
+
+def log_turn(
+    tenant_id: str,
+    guardian_id: str,
+    channel: str,
+    message: str,
+    reply: str,
+    agent: str | None,
+    student_id: str | None = None,
+    intent_source: str | None = None,
+    intent_confidence: float | None = None,
+) -> None:
     """Save the parent message and the reply to the conversations/messages
     sheets. A failed save (e.g. workbook open in Excel) is logged, not raised:
-    the parent still gets their answer."""
+    the parent still gets their answer.
+
+    Both rows carry the child and the intent decision for this turn. The
+    assistant ``agent`` is the router's ``route_to`` value. No assistant row
+    is written when this function is not called.
+    """
     store = get_store()
     now = datetime.now().isoformat(timespec="seconds")
+    meta = {
+        "student_id": student_id or None,
+        "intent_source": intent_source or None,
+        "intent_confidence": intent_confidence,
+    }
     try:
+        store.ensure_columns("messages", list(MESSAGE_META_COLUMNS))
         conversation = next(
             (
                 c for c in store.find("conversations", tenant_id=tenant_id, guardian_id=guardian_id)
@@ -90,9 +124,15 @@ def log_turn(tenant_id: str, guardian_id: str, channel: str, message: str, reply
             {"tenant_id": tenant_id, "guardian_id": guardian_id, "channel": channel, "created_at": now},
         )
         store.append_rows("messages", [
-            {"conversation_id": conversation["id"], "role": "user", "content": message, "created_at": now},
-            {"conversation_id": conversation["id"], "role": "assistant", "content": reply,
-             "agent": agent, "created_at": now},
+            {"conversation_id": conversation["id"], "role": "user", "content": message, "created_at": now, **meta},
+            {
+                "conversation_id": conversation["id"],
+                "role": "assistant",
+                "content": reply,
+                "agent": agent,
+                "created_at": now,
+                **meta,
+            },
         ])
     except WorkbookError as exc:
         logger.warning("Chat turn for %s not saved: %s", guardian_id, exc)

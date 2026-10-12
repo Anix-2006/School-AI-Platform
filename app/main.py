@@ -37,6 +37,7 @@ app.include_router(routes_teachers.router)
 def check_workbook():
     """Fail fast if the workbook is missing or has no school in it."""
     store = get_store()
+    store.ensure_columns("messages", ["student_id", "intent_source", "intent_confidence"])
     logger.info("Using %s (school: %s)", store.path, store.default_tenant_id())
 
 
