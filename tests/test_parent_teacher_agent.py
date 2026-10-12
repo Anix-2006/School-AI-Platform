@@ -61,6 +61,7 @@ def test_only_light_tools_are_bound():
     assert [t.name for t in PARENT_TEACHER_TOOLS] == [
         "get_student_profile",
         "get_teachers_for_student",
+        "get_term_topics_for_student",
     ]
 
 
