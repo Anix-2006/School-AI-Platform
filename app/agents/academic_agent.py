@@ -6,6 +6,7 @@ from app.agents.language import language_name
 from app.agents.state import AgentState
 from app.agents.tools import ACADEMIC_TOOLS
 from app.agents.tool_loop import run_tool_loop
+from app.agents.voice_prompt import voice_prompt
 
 # Stronger model - rank card narratives and syllabus explanations need
 # better reasoning/tone than a template can give.
@@ -44,5 +45,5 @@ def academic_node(state: AgentState) -> dict:
         student_id=state.get("student_id") or "unknown",
         tenant_id=state.get("tenant_id") or "unknown",
     )
-    messages = [SystemMessage(content=prompt)] + state["messages"]
+    messages = [SystemMessage(content=prompt + voice_prompt(state))] + state["messages"]
     return run_tool_loop(llm, messages, ACADEMIC_TOOLS)

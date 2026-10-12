@@ -8,6 +8,7 @@ step. Keep shared assets at `/styles.css`, `/api.js`, `/nav.js`, and
 
 - `/` — role chooser
 - Parent — `/flows/parent-chat`
+- Parent voice assistant — `/flows/voice-assistant`
 - Teacher — `/flows/teacher-workspace`
 - Management — `/flows/platform-overview`
 - Other existing pages remain available from the sidebar under `/flows/...`.
@@ -30,18 +31,59 @@ are cleared when the browser session ends.
 Use `textContent`, `createElement`, or escaped templates for API-provided data.
 Do not insert untrusted values directly with `innerHTML`.
 
+## Design system
+
+The default theme is navy glass. Shared CSS variables include `--bg-grad`,
+`--surface`, `--surface-strong`, `--border`, `--text`, `--text-muted`,
+`--accent`, `--accent-2`, `--success`, `--warning`, and `--danger`.
+
+Shared styles cover primary, secondary and ghost buttons; inputs and selects;
+chips and badges; cards and KPI tiles; tables; tabs; dialogs; toasts;
+skeletons; empty states; avatars; progress bars; the sidebar; and bottom
+navigation. Motion is 150–250ms and is disabled by `prefers-reduced-motion`.
+
+The UI uses Noto Sans and Noto Sans Devanagari, both released under the SIL
+Open Font License 1.1. Pages load them from Google Fonts with
+`font-display: swap`; system fonts remain the fallback.
+
 ## Responsive shell
 
-- Below `640px`: compact mobile content and stacked controls.
-- From `640px`: tablet content gains wider padding and multi-column layouts
-  where each flow supports them.
-- From `1024px`: the fixed `17rem` sidebar and desktop content topbar are
-  persistent. The hamburger, close button, and backdrop are hidden.
+- Mobile-first layouts are the default. Small-flow adjustments occur at
+  `420px`, `430px`, and `599px`; task rows stack through `640px`.
+- Records widen at `620px` and switch from cards to a table at `760px`.
+- Most parent, teacher, role, and management grids widen from `700px`.
+- Older workspace/helper layouts widen at `800px`, parent chat at `860px`,
+  and the teacher dashboard at `900px`.
+- From `1024px`: the fixed `15rem` sidebar and desktop content topbar are
+  persistent inside the rounded floating shell. The hamburger, close button,
+  bottom navigation, and backdrop are hidden.
 - From `1440px`: shell gutters widen while content stays centred at a maximum
   width of `80rem`.
 
 The sidebar remains keyboard reachable on desktop. Mobile drawer focus
 management and all layouts below `1024px` remain unchanged.
+
+## Voice controls and states
+
+Voice mode is `/flows/voice-assistant`. One initial tap unlocks microphone and
+audio; after that browser energy detection ends each turn, the reply plays
+automatically, and listening resumes. It supports English and Hindi per turn.
+
+- States: idle, waving, listening, thinking, speaking, stopped, and error.
+- Controls: mute, stop/restart, captions, child switcher, and detected-language
+  chip.
+- Speaking while playback is active stops Vaani and starts a new turn.
+- Twenty seconds of silence plays one idle prompt; another twenty seconds
+  releases the microphone.
+- Mobile uses a four-item bottom bar. At `1024px`, Voice appears in the fixed
+  sidebar and the assistant stays centred at a maximum width of `48rem`.
+- Vaani is an original inline-SVG mascot with reduced-motion-safe state
+  animation. Separate SVG groups animate its eyes, mouth, antenna, arms, and
+  body. Exported 32px and 512px PNGs are in `ui/assets/`.
+
+Recording prefers low-bitrate mono WebM/Opus and uses MP4/AAC on iOS Safari.
+Microphone access works on `http://localhost`; non-local pages require HTTPS
+and permission.
 
 ## Security and data limits
 

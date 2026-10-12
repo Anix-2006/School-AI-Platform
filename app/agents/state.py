@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 from typing_extensions import TypedDict
 from langgraph.graph.message import add_messages
 
@@ -12,9 +12,13 @@ class AgentState(TypedDict):
     tenant_id: str
     student_id: Optional[str]
     guardian_id: str
-    language: str            # en / hi / te
+    language: str            # interface/profile language
+    reply_language: Optional[str]  # en / hi, selected per voice turn
+    channel: Literal["chat", "voice"]
     age_tier: Optional[str]  # pre_primary / primary_lower / primary
     intent: Optional[str]    # set by orchestrator's router step
     route_to: Optional[str]  # which specialist agent handles this turn
     intent_source: Optional[str]        # "classifier" or "llm"
     intent_confidence: Optional[float]  # classifier probability; None for llm
+    router_ms: Optional[int]
+    agent_llm_ms: Optional[int]

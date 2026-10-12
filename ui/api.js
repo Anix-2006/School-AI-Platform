@@ -50,7 +50,7 @@
         return `${field ? `${field}: ` : ""}${issue.msg || "invalid value"}`;
       }).join("; ");
     }
-    if (status === 400 || status === 422) {
+    if (status === 400 || status === 413 || status === 415 || status === 422) {
       return detail || "Please check the information and try again.";
     }
     if (status === 401) return "Your session expired. Please try again.";
@@ -102,20 +102,32 @@
       auth = false,
       timeout = DEFAULT_TIMEOUT,
       retry = false,
+      responseType = "json",
+      announceErrors = true,
+      signal: externalSignal,
       headers: optionHeaders = {},
       ...fetchOptions
     } = options;
     const headers = { ...optionHeaders };
-    if (fetchOptions.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+    const hasContentType = Object.keys(headers).some(
+      (name) => name.toLowerCase() === "content-type",
+    );
+    if (fetchOptions.body && !(fetchOptions.body instanceof FormData) && !hasContentType) {
+      headers["Content-Type"] = "application/json";
+    }
     if (auth) {
       if (!state.token) await refreshAuth();
       headers.Authorization = `Bearer ${state.token}`;
     }
 
     const controller = new AbortController();
+    const abortRequest = () => controller.abort();
+    externalSignal?.addEventListener("abort", abortRequest, { once: true });
     const timer = window.setTimeout(() => controller.abort(), timeout);
     const slowTimer = window.setTimeout(() => {
-      announce("slow", "The school service is starting. This can take a few seconds.");
+      if (announceErrors) {
+        announce("slow", "The school service is starting. This can take a few seconds.");
+      }
     }, 2500);
 
     try {
@@ -124,12 +136,18 @@
         headers,
         signal: controller.signal,
       });
-      const text = await response.text();
+      const payload = response.ok && responseType === "blob"
+        ? await response.blob()
+        : await response.text();
       let data = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        data = text;
+      if (payload instanceof Blob) {
+        data = payload;
+      } else {
+        try {
+          data = payload ? JSON.parse(payload) : null;
+        } catch {
+          data = payload;
+        }
       }
 
       if (response.status === 401 && auth && !alreadyRetried) {
@@ -151,11 +169,14 @@
       const safeRetry = retry || !fetchOptions.method || fetchOptions.method === "GET";
       const wrapped = new Error(message);
       wrapped.status = error.status || 0;
-      announce("error", message, safeRetry ? () => request(path, options) : null);
+      if (announceErrors) {
+        announce("error", message, safeRetry ? () => request(path, options) : null);
+      }
       throw wrapped;
     } finally {
       window.clearTimeout(timer);
       window.clearTimeout(slowTimer);
+      externalSignal?.removeEventListener("abort", abortRequest);
     }
   }
 
@@ -231,6 +252,34 @@
       agent: "Helper",
       typing: "School helper is typing",
       emptyMessage: "Write a message before sending.",
+      voiceRecord: "Record voice message",
+      voiceStop: "Stop recording",
+      voiceCancel: "Cancel",
+      voiceListening: "Listening…",
+      voiceRecording: "Recording",
+      voiceUploading: "Uploading audio…",
+      voiceTranscribing: "Transcribing…",
+      voiceThinking: "Thinking…",
+      voiceSpeaking: "Audio reply ready.",
+      voiceReady: "Voice message ready.",
+      voiceWarming: "Voice service is warming up. Text chat is still available.",
+      voiceUnavailable: "Voice messages are not available in this browser.",
+      voicePermission: "Microphone permission was denied. Allow access and try again.",
+      voiceNoDevice: "No microphone was found.",
+      voiceOffline: "You are offline. Text chat is still available.",
+      voiceBusy: "Voice service is busy. Please wait and try again.",
+      voiceNoConsent: "Consent is required before a voice message can be processed.",
+      voiceUnclear: "We could not understand that audio. Please try again or type your message.",
+      voiceUploadError: "The voice message could not be processed. Please try again.",
+      voiceAudioError: "Audio could not play. The full text reply is shown.",
+      voicePrivacy: "Your voice is processed by AI and is not stored as audio.",
+      voicePrivacyContinue: "Continue",
+      voiceEditTranscript: "Edit transcript",
+      voicePlay: "Play reply",
+      voicePause: "Pause reply",
+      voiceReplay: "Replay",
+      voiceProgress: "Audio progress",
+      voiceSeconds: "seconds",
     }),
     hi: Object.freeze({
       appName: "स्कूल पैरेंट AI",
@@ -286,6 +335,34 @@
       agent: "सहायक",
       typing: "स्कूल सहायक लिख रहा है",
       emptyMessage: "भेजने से पहले संदेश लिखें।",
+      voiceRecord: "वॉइस संदेश रिकॉर्ड करें",
+      voiceStop: "रिकॉर्डिंग रोकें",
+      voiceCancel: "रद्द करें",
+      voiceListening: "सुन रहा है…",
+      voiceRecording: "रिकॉर्डिंग",
+      voiceUploading: "ऑडियो अपलोड हो रहा है…",
+      voiceTranscribing: "आवाज़ को लिख रहा है…",
+      voiceThinking: "सोच रहा है…",
+      voiceSpeaking: "ऑडियो उत्तर तैयार है।",
+      voiceReady: "वॉइस संदेश तैयार है।",
+      voiceWarming: "वॉइस सेवा शुरू हो रही है। टेक्स्ट चैट उपलब्ध है।",
+      voiceUnavailable: "इस ब्राउज़र में वॉइस संदेश उपलब्ध नहीं हैं।",
+      voicePermission: "माइक्रोफ़ोन की अनुमति नहीं मिली। अनुमति देकर फिर कोशिश करें।",
+      voiceNoDevice: "कोई माइक्रोफ़ोन नहीं मिला।",
+      voiceOffline: "आप ऑफ़लाइन हैं। टेक्स्ट चैट उपलब्ध है।",
+      voiceBusy: "वॉइस सेवा व्यस्त है। थोड़ी देर बाद कोशिश करें।",
+      voiceNoConsent: "वॉइस संदेश के लिए सहमति आवश्यक है।",
+      voiceUnclear: "ऑडियो समझ नहीं आया। फिर कोशिश करें या संदेश लिखें।",
+      voiceUploadError: "वॉइस संदेश प्रोसेस नहीं हुआ। फिर कोशिश करें।",
+      voiceAudioError: "ऑडियो नहीं चला। पूरा उत्तर टेक्स्ट में दिखाया गया है।",
+      voicePrivacy: "आपकी आवाज़ AI द्वारा प्रोसेस होती है और ऑडियो के रूप में सहेजी नहीं जाती।",
+      voicePrivacyContinue: "जारी रखें",
+      voiceEditTranscript: "लिखे संदेश को संपादित करें",
+      voicePlay: "उत्तर चलाएँ",
+      voicePause: "उत्तर रोकें",
+      voiceReplay: "फिर चलाएँ",
+      voiceProgress: "ऑडियो प्रगति",
+      voiceSeconds: "सेकंड",
     }),
     te: Object.freeze({
       appName: "స్కూల్ పేరెంట్ AI",
@@ -430,6 +507,47 @@
         method: "POST",
         body: JSON.stringify(payload),
         auth: true,
+      });
+    },
+    async voiceStatus() {
+      await ensureAuth();
+      return request("/voice/status", {
+        auth: true,
+        timeout: 20000,
+        announceErrors: false,
+      });
+    },
+    async voiceChat(formData, signal = null) {
+      await ensureAuth();
+      return request("/voice/chat", {
+        method: "POST",
+        body: formData,
+        auth: true,
+        timeout: 90000,
+        announceErrors: false,
+        signal,
+      });
+    },
+    async voiceAudio(audioId, guardianId) {
+      await ensureAuth();
+      const id = encodeURIComponent(audioId);
+      const guardian = encodeURIComponent(guardianId);
+      return request(`/voice/audio/${id}?guardian_id=${guardian}`, {
+        auth: true,
+        responseType: "blob",
+        timeout: 30000,
+        announceErrors: false,
+      });
+    },
+    async voiceSpeak(text, language) {
+      await ensureAuth();
+      return request("/voice/speak", {
+        method: "POST",
+        body: JSON.stringify({ text, language: normalizeLanguage(language) }),
+        auth: true,
+        responseType: "blob",
+        timeout: 90000,
+        announceErrors: false,
       });
     },
     async sendWhatsAppWebhook(fromNumber, text) {

@@ -29,6 +29,7 @@ def test_reply_uses_guardian_child_and_language(client, graph):
     assert state["student_id"] == "s-3-1"
     assert state["language"] == "hi"
     assert state["age_tier"] == "primary"
+    assert state["channel"] == "chat"
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == PRIYA
 
 
@@ -62,6 +63,37 @@ def test_session_id_gives_a_separate_memory_thread(client, graph):
     assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:abc"
 
 
+def test_shared_message_handler_reuses_chat_thread_for_other_channels(graph, store):
+    result = chat_service.handle_parent_message(
+        store.default_tenant_id(),
+        PRIYA,
+        "Voice question",
+        session_id="call-1",
+        channel="voice",
+    )
+
+    assert result["student_id"] == "s-3-1"
+    assert graph.calls[0]["config"]["configurable"]["thread_id"] == f"{PRIYA}:call-1"
+    conversations = store.find("conversations", guardian_id=PRIYA)
+    assert conversations[0]["channel"] == "voice"
+    messages = store.find("messages", conversation_id=conversations[0]["id"])
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "Voice question"
+
+
+def test_shared_message_handler_preserves_access_errors(graph, store):
+    with pytest.raises(chat_service.ChatAccessError) as exc_info:
+        chat_service.handle_parent_message(
+            store.default_tenant_id(),
+            "g-nobody",
+            "hi",
+            channel="voice",
+        )
+
+    assert exc_info.value.status_code == 404
+    assert graph.calls == []
+
+
 def test_turn_is_saved_to_conversations_and_messages(client, graph, store):
     client.post("/chat", json={"guardian_id": PRIYA, "message": "First question"})
     client.post("/chat", json={"guardian_id": PRIYA, "message": "Second question"})
@@ -73,7 +105,42 @@ def test_turn_is_saved_to_conversations_and_messages(client, graph, store):
     messages = store.find("messages", conversation_id=conversations[0]["id"])
     assert [m["role"] for m in messages] == ["user", "assistant", "user", "assistant"]
     assert messages[0]["content"] == "First question"
+    assert messages[0]["student_id"] == "s-3-1"
+    assert messages[1]["student_id"] == "s-3-1"
     assert messages[1]["agent"] == "daily_update"
+    assert messages[0]["intent_source"] == "llm"
+    assert messages[1]["intent_confidence"] is None
+
+
+def test_turn_metadata_follows_route_and_intent(client, store, monkeypatch):
+    from langchain_core.messages import AIMessage
+
+    class Sequenced:
+        def __init__(self):
+            self.pending = [
+                {"route_to": "parent_teacher", "intent_source": "classifier", "intent_confidence": 0.96},
+                {"route_to": "communication", "intent_source": "llm", "intent_confidence": None},
+            ]
+
+        def invoke(self, state, config=None):
+            spec = self.pending.pop(0)
+            return {"messages": [*state["messages"], AIMessage(content="Saved reply.")], **spec}
+
+    monkeypatch.setattr(chat_service, "orchestrator_graph", Sequenced())
+    assert client.post("/chat", json={"guardian_id": PRIYA, "message": "Who teaches Maths?"}).status_code == 200
+    assert client.post("/chat", json={"guardian_id": PRIYA, "message": "Thank you"}).status_code == 200
+
+    messages = store.find("messages", conversation_id=store.find("conversations", guardian_id=PRIYA)[0]["id"])
+    parent, assistant = messages[0], messages[1]
+    assert parent["student_id"] == assistant["student_id"] == "s-3-1"
+    assert parent["intent_source"] == assistant["intent_source"] == "classifier"
+    assert parent["intent_confidence"] == assistant["intent_confidence"] == 0.96
+    assert assistant["agent"] == "parent_teacher"
+    fallback_user, fallback_assistant = messages[2], messages[3]
+    assert fallback_user["intent_source"] == fallback_assistant["intent_source"] == "llm"
+    assert fallback_user["intent_confidence"] is None
+    assert fallback_assistant["agent"] == "communication"
+    assert fallback_assistant["content"] == "Saved reply."
 
 
 def test_reply_still_returned_when_workbook_is_locked(client, graph, monkeypatch):

@@ -12,6 +12,10 @@ Client (WhatsApp/voice/app) -> FastAPI gateway -> LangGraph orchestrator
 
 See `app/agents/orchestrator.py` for the graph definition.
 
+Voice adds in-memory audio validation, faster-whisper speech-to-text, the same
+chat access checks/orchestrator/history, and gTTS speech output. It is disabled
+by default.
+
 ## Structure
 
 ```
@@ -38,6 +42,10 @@ docker compose up --build
 
 API docs at http://localhost:8000/docs once running.
 
+For the Python 3.11 setup, voice configuration, secure-browser requirements,
+manual checks, Render deployment, limits, and unmeasured verification
+templates, see [RUNNING.md](RUNNING.md). Run one uvicorn worker.
+
 ## Demo data
 
 Every read and write goes through `get_store()` in
@@ -46,6 +54,12 @@ Edit the workbook and save it - the app picks up the change on the next
 request, no restart needed. Close the file in Excel before using pages
 that write (marking tasks done, adding students, chat history), because
 Windows locks files that are open in Excel. Run a single uvicorn worker.
+
+To export saved parent–teacher question/answer pairs for offline evaluation, from the repo root:
+
+    python scripts/export_parent_teacher_turns.py
+
+`--since YYYY-MM-DD` keeps turns on or after that date (inclusive). `--agent NAME` exports a different agent's replies (default `parent_teacher`). The file is written to `data/exports/parent_teacher_turns.jsonl`. Exports can contain sensitive student information, stay on this machine, and `data/exports/` is gitignored.
 
 ## What's production-shaped vs stubbed
 
