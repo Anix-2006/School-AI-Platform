@@ -32,6 +32,7 @@ FLOW_PAGES = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     store = get_store()
+    store.ensure_columns("messages", ["student_id", "intent_source", "intent_confidence"])
     logger.info("Using %s (school: %s)", store.path, store.default_tenant_id())
 
     runtime = getattr(app.state, "voice_runtime", None)

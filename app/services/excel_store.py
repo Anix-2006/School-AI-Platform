@@ -171,6 +171,37 @@ class ExcelStore:
 
     # ---- writes --------------------------------------------------------
 
+    def ensure_columns(self, sheet: str, columns: list[str]) -> list[str]:
+        """Append headers that are not already on the sheet.
+
+        Existing headers, their order, and every data row stay as they are.
+        Calling this again does not duplicate a column.
+        """
+        with self._lock:
+            wb = self._open_for_write()
+            ws = self._sheet_for_write(wb, sheet)
+            headers = [str(c.value).strip() if c.value is not None else "" for c in ws[1]]
+            present = {h for h in headers if h}
+            next_col = 1
+            for index, header in enumerate(headers, start=1):
+                if header:
+                    next_col = index + 1
+            for name in columns:
+                if not name or name in present:
+                    continue
+                ws.cell(1, next_col, name)
+                present.add(name)
+                next_col += 1
+            ordered = [h for h in headers if h]
+            for name in columns:
+                if name and name not in ordered:
+                    ordered.append(name)
+            if ordered != [h for h in headers if h]:
+                self._save(wb)
+            else:
+                wb.close()
+            return ordered
+
     def append_rows(self, sheet: str, rows: list[dict]) -> list[dict]:
         """Append rows (one save for all of them). Missing ids are generated."""
         if not rows:
