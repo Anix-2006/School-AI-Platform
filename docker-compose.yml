@@ -8,3 +8,8 @@ services:
       - ./app:/app/app
       - ./ui:/app/ui
       - ./data:/app/data
+      # Matches the default WHISPER_MODEL_DIR=models/whisper under WORKDIR /app.
+      - whisper-models:/app/models/whisper
+
+volumes:
+  whisper-models:

@@ -267,7 +267,8 @@ def _initial_prompt(student: dict) -> str:
     subject = f"Student {name}." if name else "The linked student."
     return (
         f"{subject} School terms: attendance, homework, syllabus, "
-        "FA1, FA2, formative assessment, summative assessment."
+        "FA1, FA2, formative assessment, summative assessment. "
+        "उपस्थिति, होमवर्क, परीक्षा, अंक, सिलेबस।"
     )
 
 
