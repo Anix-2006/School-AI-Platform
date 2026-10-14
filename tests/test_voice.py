@@ -15,7 +15,7 @@ from app.voice.service import (
     audio_owner_key,
     choose_reply_language,
 )
-from app.voice.stt import Transcript
+from app.voice.stt import FasterWhisperEngine, Transcript, closest_supported_language
 from app.voice.storage import AudioStore
 
 
@@ -149,6 +149,69 @@ def test_silence_and_repetition_are_detected():
     assert _is_unusable_transcript(Transcript("yes yes yes yes yes", "en", 1, 1))
     assert not _is_unusable_transcript(Transcript("Homework?", "en", 1, 1))
     assert not _is_unusable_transcript(Transcript("what is the homework today", "en", 1, 1))
+
+
+class FakeWhisperModel:
+    def __init__(self, detected, probs=None):
+        self.detected = detected
+        self.probs = probs
+        self.calls = []
+
+    def transcribe(self, audio, **kwargs):
+        self.calls.append(kwargs)
+        language = kwargs["language"] or self.detected
+        info = types.SimpleNamespace(
+            language=language,
+            all_language_probs=None if kwargs["language"] else self.probs,
+            duration=1.0,
+        )
+        segment = types.SimpleNamespace(text=f" text-{language}", no_speech_prob=0.1)
+        return iter([segment]), info
+
+
+def engine_with(model):
+    engine = FasterWhisperEngine("small")
+    engine._model = model
+    return engine
+
+
+def test_stt_retries_repetitive_decodes_at_higher_temperatures():
+    model = FakeWhisperModel("en", [("en", 0.9)])
+    transcript = engine_with(model).transcribe(b"audio", "audio/webm")
+    assert transcript.text == "text-en"
+    assert len(model.calls) == 1
+    assert model.calls[0]["temperature"] == (0.0, 0.2, 0.4)
+    assert model.calls[0]["vad_filter"] is True
+
+
+def test_stt_maps_urdu_detection_to_hindi():
+    model = FakeWhisperModel("ur", [("ur", 0.5), ("hi", 0.3), ("en", 0.1)])
+    transcript = engine_with(model).transcribe(b"audio", "audio/webm", initial_prompt="p")
+    assert [call["language"] for call in model.calls] == [None, "hi"]
+    assert model.calls[1]["initial_prompt"] == "p"
+    assert transcript.language == "hi"
+    assert transcript.text == "text-hi"
+
+
+def test_stt_explicit_language_is_not_redetected():
+    model = FakeWhisperModel("ur")
+    transcript = engine_with(model).transcribe(b"audio", "audio/webm", language="en")
+    assert [call["language"] for call in model.calls] == ["en"]
+    assert transcript.language == "en"
+
+
+@pytest.mark.parametrize(
+    "language, probs, expected",
+    [
+        ("mr", [("mr", 0.4), ("hi", 0.3), ("en", 0.2)], "hi"),
+        ("cy", [("cy", 0.4), ("en", 0.35), ("hi", 0.05)], "en"),
+        ("ur", None, "hi"),
+        ("te", None, "en"),
+    ],
+)
+def test_closest_supported_language(language, probs, expected):
+    info = types.SimpleNamespace(language=language, all_language_probs=probs)
+    assert closest_supported_language(info) == expected
 
 
 def test_tts_failure_degrades_to_text(monkeypatch):
