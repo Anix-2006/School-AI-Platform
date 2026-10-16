@@ -1,3 +1,4 @@
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,10 +31,17 @@ class Settings(BaseSettings):
     whisper_model: str = "tiny"
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
-    voice_max_concurrency: int = 1
+    # Parallel STT workers (CPU default 1). VOICE_MAX_CONCURRENCY is a legacy alias.
+    voice_max_parallel: int = Field(1, ge=1)
+    voice_max_concurrency: int = Field(1, ge=1)
+    # Waiting jobs only (not counting active transcriptions).
+    voice_queue_max: int = Field(16, ge=0)
+    # Notify when waiting count after admission is >= this (waiting only).
+    voice_queue_notify_at: int = Field(2, ge=1)
     voice_max_seconds: float = 30
     voice_max_bytes: int = 5_242_880
     tts_cache_size: int = 128
+    # Retained for older .env files; admission uses voice_queue_max instead.
     voice_queue_timeout: float = 2.0
     voice_guardian_rate: int = 10
     voice_global_rate: int = 60
@@ -42,6 +50,18 @@ class Settings(BaseSettings):
     voice_audio_ttl: float = 300.0
     voice_vad_silence_ms: int = 800
     voice_idle_prompt_seconds: int = 20
+
+    @model_validator(mode="after")
+    def _alias_max_parallel(self) -> "Settings":
+        """Honor legacy VOICE_MAX_CONCURRENCY when VOICE_MAX_PARALLEL is unset."""
+        import os
+
+        if (
+            os.getenv("VOICE_MAX_PARALLEL") is None
+            and os.getenv("VOICE_MAX_CONCURRENCY") is not None
+        ):
+            self.voice_max_parallel = self.voice_max_concurrency
+        return self
 
 
 settings = Settings()

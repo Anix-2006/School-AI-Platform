@@ -41,7 +41,10 @@ class VoiceRuntime:
                     stt,
                     tts,
                     AudioStore(ttl_seconds=settings.voice_audio_ttl),
+                    max_parallel=settings.voice_max_parallel,
                     max_concurrency=settings.voice_max_concurrency,
+                    queue_max=settings.voice_queue_max,
+                    queue_notify_at=settings.voice_queue_notify_at,
                     queue_timeout=settings.voice_queue_timeout,
                     guardian_rate=settings.voice_guardian_rate,
                     global_rate=settings.voice_global_rate,
@@ -61,3 +64,4 @@ class VoiceRuntime:
     def close(self) -> None:
         if self.service is not None:
             self.service.close()
+            self.service = None

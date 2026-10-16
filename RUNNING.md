@@ -34,10 +34,18 @@ voice model, limits, and audio cache in one process. Close
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
 - `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
-- `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
+- `VOICE_MAX_PARALLEL=1`: maximum simultaneous Whisper transcriptions (CPU
+  default). `VOICE_MAX_CONCURRENCY` is a legacy alias used only when
+  `VOICE_MAX_PARALLEL` is unset.
+- `VOICE_QUEUE_MAX=16`: maximum *waiting* transcription jobs (not counting
+  active ones). When full, the parent gets a localized busy/retry reply and
+  the job is not transcribed.
+- `VOICE_QUEUE_NOTIFY_AT=2`: after a job is admitted, if the waiting count
+  (waiting only) is at least this value, send one short localized
+  "processing" status. Active transcriptions are not counted.
 - `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
-- `VOICE_QUEUE_TIMEOUT=2.0`: seconds to wait for a voice job slot.
+- `VOICE_QUEUE_TIMEOUT=2.0`: legacy; admission uses `VOICE_QUEUE_MAX` instead.
 - `VOICE_GUARDIAN_RATE=10`: voice-chat requests per guardian per 60 seconds.
 - `VOICE_GLOBAL_RATE=60`: all voice chat and speak requests per process per
   60 seconds.
@@ -50,6 +58,26 @@ voice model, limits, and audio cache in one process. Close
   still present.
 
 Restart the service after changing environment variables.
+
+## Voice transcription queue
+
+Speech-to-text runs behind a process-local FIFO queue in each uvicorn worker:
+
+1. A job is admitted if either an active STT slot is free
+   (`active < VOICE_MAX_PARALLEL`) or there is waiting room
+   (`waiting < VOICE_QUEUE_MAX`).
+2. Waiting capacity does **not** include active transcriptions.
+3. Admitted jobs run Whisper one-after-another up to `VOICE_MAX_PARALLEL`.
+   Agent / TTS work happens after the STT slot is released.
+4. If waiting jobs after admission are `>= VOICE_QUEUE_NOTIFY_AT`, at most one
+   localized status phrase is sent via the configured notifier (HTTP responses
+   also expose `queue_notice` when that fires). Messaging failures do not free
+   or duplicate STT work.
+5. If the waiting queue is full, the API returns HTTP 429 with a localized busy
+   phrase; that audio is not transcribed.
+
+The queue is not shared across workers or hosts. Run a single worker for the
+workbook-backed demo, as elsewhere in this guide.
 
 ## Voice startup and browser requirements
 
