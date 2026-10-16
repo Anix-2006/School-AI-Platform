@@ -6,14 +6,22 @@ import re
 import threading
 import time
 from collections import defaultdict, deque
+from typing import Awaitable, Callable
 
 from app.services.chat_service import run_parent_turn
 from app.voice.speech_text import clean_for_speech
 from app.voice.stt import SttEngine, Transcript
 from app.voice.storage import AudioStore
+from app.voice.transcription_queue import (
+    TranscriptionQueue,
+    TranscriptionQueueClosed,
+    TranscriptionQueueFull,
+)
 from app.voice.tts import TtsEngine
 
 logger = logging.getLogger(__name__)
+
+QueueNotifier = Callable[[str, str], Awaitable[None]]
 
 
 class VoiceError(Exception):
@@ -47,22 +55,36 @@ class VoiceService:
         tts: TtsEngine,
         audio_store: AudioStore,
         *,
+        max_parallel: int | None = None,
         max_concurrency: int = 1,
+        queue_max: int = 16,
+        queue_notify_at: int = 2,
         queue_timeout: float = 2.0,
         guardian_rate: int = 10,
         global_rate: int = 60,
         speak_rate: int = 20,
         max_seconds: float = 30.0,
+        queue_notifier: QueueNotifier | None = None,
     ):
         self.stt = stt
         self.tts = tts
         self.audio_store = audio_store
+        # Legacy alias: older callers pass max_concurrency only.
+        parallel = max_parallel if max_parallel is not None else max_concurrency
+        self.max_parallel = max(1, parallel)
+        self.queue_max = max(0, queue_max)
+        self.queue_notify_at = max(1, queue_notify_at)
         self.queue_timeout = queue_timeout
         self.guardian_rate = guardian_rate
         self.global_rate = global_rate
         self.speak_rate = speak_rate
         self.max_seconds = max_seconds
-        self._slots = asyncio.Semaphore(max(1, max_concurrency))
+        self._queue_notifier = queue_notifier
+        self._queue = TranscriptionQueue(
+            max_parallel=self.max_parallel,
+            queue_max=self.queue_max,
+            notify_at=self.queue_notify_at,
+        )
         self._rates = SlidingRateLimiter()
 
     def check_rate(self, action: str, guardian_id: str) -> None:
@@ -86,102 +108,123 @@ class VoiceService:
         decode_ms: int = 0,
     ) -> dict:
         self.check_rate("chat", guardian["id"])
-        started = time.perf_counter()
         fallback_language = _voice_language(language, guardian)
-        try:
-            await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
-        except TimeoutError:
-            raise VoiceError(429, "Voice service is busy; please try again") from None
-        queued = time.perf_counter()
-        try:
+        status_language = fallback_language
+        queue_notice: str | None = None
+
+        async def on_notify() -> None:
+            nonlocal queue_notice
+            phrase = queue_status_phrase(status_language)
+            queue_notice = phrase
+            if self._queue_notifier is not None:
+                await self._queue_notifier(guardian["id"], phrase)
+
+        stt_ms = 0
+
+        async def transcribe() -> Transcript:
+            nonlocal stt_ms
             prompt = _initial_prompt(student)
-            transcript = await asyncio.to_thread(
-                self.stt.transcribe, audio, content_type, None, prompt
-            )
-            transcribed = time.perf_counter()
-            reply_language = choose_reply_language(transcript)
-            if (
-                transcript.duration is not None
-                and transcript.duration > self.max_seconds
-            ):
-                raise VoiceError(413, f"Audio exceeds the {self.max_seconds:g} second limit")
-            if _is_unusable_transcript(transcript):
-                return await self._friendly_retry(
-                    transcript,
-                    reply_language if transcript.text.strip() else fallback_language,
-                    tenant_id,
-                    guardian["id"],
-                    student["id"],
-                    started,
-                    queued,
-                    transcribed,
-                    upload_ms,
-                    decode_ms,
-                )
-            thread_id = (
-                f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
-            )
-            result = await asyncio.to_thread(
-                run_parent_turn,
-                tenant_id,
-                guardian,
-                student,
-                transcript.text,
-                "voice",
-                thread_id,
-                reply_language,
-            )
-            replied = time.perf_counter()
-            spoken_text = clean_for_speech(result["reply"], reply_language)
+            stt_started = time.perf_counter()
             try:
-                speech = await self.tts.synthesize(spoken_text, reply_language)
-            except Exception:
-                speech = b""
-            finished = time.perf_counter()
-            audio_id = (
-                self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
-                if speech
-                else None
+                return await asyncio.to_thread(
+                    self.stt.transcribe, audio, content_type, None, prompt
+                )
+            finally:
+                stt_ms = round((time.perf_counter() - stt_started) * 1000)
+
+        try:
+            transcript, admission = await self._queue.run(
+                transcribe, on_notify=on_notify
             )
-            router_ms = int(result.get("router_ms") or 0)
-            agent_ms = int(result.get("agent_llm_ms") or max(
-                0, round((replied - transcribed) * 1000) - router_ms
-            ))
-            timings_ms = {
-                "upload": upload_ms,
-                "decode": decode_ms,
-                "queue": round((queued - started) * 1000),
-                "stt": round((transcribed - queued) * 1000),
-                "router": router_ms,
-                "agent_llm": agent_ms,
-                "tts": round((finished - replied) * 1000),
-            }
-            timings_ms["total"] = sum(timings_ms.values())
-            logger.info(
-                "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
+        except TranscriptionQueueFull as exc:
+            raise VoiceError(429, queue_busy_phrase(status_language)) from exc
+        except TranscriptionQueueClosed as exc:
+            raise VoiceError(503, queue_busy_phrase(status_language)) from exc
+
+        reply_language = choose_reply_language(transcript)
+        if (
+            transcript.duration is not None
+            and transcript.duration > self.max_seconds
+        ):
+            raise VoiceError(413, f"Audio exceeds the {self.max_seconds:g} second limit")
+        if _is_unusable_transcript(transcript):
+            return await self._friendly_retry(
+                transcript,
+                reply_language if transcript.text.strip() else fallback_language,
+                tenant_id,
                 guardian["id"],
-                session_id or "default",
-                reply_language,
-                timings_ms,
+                student["id"],
+                upload_ms,
+                decode_ms,
+                admission.wait_ms,
+                stt_ms,
             )
-            return {
-                **result,
-                "language": reply_language,
-                "transcript": transcript.text,
-                "spoken_text": spoken_text,
-                "audio_id": audio_id,
-                "tts_degraded": not bool(speech),
-                "timings": {
-                    "queue": timings_ms["queue"],
-                    "stt": timings_ms["stt"],
-                    "llm": timings_ms["router"] + timings_ms["agent_llm"],
-                    "tts": timings_ms["tts"],
-                    "total": timings_ms["total"],
-                },
-                "timings_ms": timings_ms,
-            }
-        finally:
-            self._slots.release()
+        thread_id = (
+            f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
+        )
+        llm_started = time.perf_counter()
+        result = await asyncio.to_thread(
+            run_parent_turn,
+            tenant_id,
+            guardian,
+            student,
+            transcript.text,
+            "voice",
+            thread_id,
+            reply_language,
+        )
+        replied = time.perf_counter()
+        spoken_text = clean_for_speech(result["reply"], reply_language)
+        try:
+            speech = await self.tts.synthesize(spoken_text, reply_language)
+        except Exception:
+            speech = b""
+        finished = time.perf_counter()
+        audio_id = (
+            self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
+            if speech
+            else None
+        )
+        router_ms = int(result.get("router_ms") or 0)
+        agent_ms = int(result.get("agent_llm_ms") or max(
+            0, round((replied - llm_started) * 1000) - router_ms
+        ))
+        timings_ms = {
+            "upload": upload_ms,
+            "decode": decode_ms,
+            "queue": admission.wait_ms,
+            "stt": stt_ms,
+            "router": router_ms,
+            "agent_llm": agent_ms,
+            "tts": round((finished - replied) * 1000),
+        }
+        timings_ms["total"] = sum(timings_ms.values())
+        logger.info(
+            "voice_turn guardian_id=%s session_id=%s language=%s "
+            "queue_waiting_at_admit=%s timings_ms=%s",
+            guardian["id"],
+            session_id or "default",
+            reply_language,
+            admission.waiting,
+            timings_ms,
+        )
+        return {
+            **result,
+            "language": reply_language,
+            "transcript": transcript.text,
+            "spoken_text": spoken_text,
+            "audio_id": audio_id,
+            "tts_degraded": not bool(speech),
+            "queue_notice": queue_notice,
+            "timings": {
+                "queue": timings_ms["queue"],
+                "stt": timings_ms["stt"],
+                "llm": timings_ms["router"] + timings_ms["agent_llm"],
+                "tts": timings_ms["tts"],
+                "total": timings_ms["total"],
+            },
+            "timings_ms": timings_ms,
+        }
 
     async def _friendly_retry(
         self,
@@ -190,11 +233,10 @@ class VoiceService:
         tenant_id: str,
         guardian_id: str,
         student_id: str,
-        started: float,
-        queued: float,
-        transcribed: float,
         upload_ms: int,
         decode_ms: int,
+        wait_ms: int,
+        stt_ms: int,
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
@@ -206,8 +248,8 @@ class VoiceService:
         timings_ms = {
             "upload": upload_ms,
             "decode": decode_ms,
-            "queue": round((queued - started) * 1000),
-            "stt": round((transcribed - queued) * 1000),
+            "queue": wait_ms,
+            "stt": stt_ms,
             "router": 0,
             "agent_llm": 0,
             "tts": round((finished - tts_started) * 1000),
@@ -254,12 +296,42 @@ class VoiceService:
         close = getattr(self.tts, "close", None)
         if close is not None:
             close()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                asyncio.run(self._queue.close())
+            except RuntimeError:
+                pass
+        else:
+            loop.create_task(self._queue.close())
 
 
 _RETRY_REPLIES = {
     "en": "I could not hear a clear question. Please try again.",
     "hi": "मुझे सवाल साफ़ सुनाई नहीं दिया। कृपया फिर से बोलें।",
+    "te": "నాకు ప్రశ్న స్పష్టంగా వినిపించలేదు. దయచేసి మళ్లీ చెప్పండి.",
 }
+
+_QUEUE_STATUS = {
+    "en": "Got your message — I'm processing it now.",
+    "hi": "आपका संदेश मिल गया — मैं अभी प्रोसेस कर रही हूँ।",
+    "te": "మీ సందేశం అందింది — నేను ఇప్పుడు ప్రాసెస్ చేస్తున్నాను.",
+}
+
+_QUEUE_BUSY = {
+    "en": "The voice service is busy right now. Please try again shortly.",
+    "hi": "वॉइस सेवा अभी व्यस्त है। कृपया थोड़ी देर बाद फिर कोशिश करें।",
+    "te": "వాయిస్ సేవ ప్రస్తుతం బిజీగా ఉంది. దయచేసి కొద్దిసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
+}
+
+
+def queue_status_phrase(language: str) -> str:
+    return _QUEUE_STATUS.get(language, _QUEUE_STATUS["en"])
+
+
+def queue_busy_phrase(language: str) -> str:
+    return _QUEUE_BUSY.get(language, _QUEUE_BUSY["en"])
 
 
 def _initial_prompt(student: dict) -> str:
@@ -272,10 +344,10 @@ def _initial_prompt(student: dict) -> str:
 
 
 def _voice_language(override: str | None, guardian: dict) -> str:
-    if override in {"en", "hi"}:
+    if override in {"en", "hi", "te"}:
         return override
     preferred = guardian.get("preferred_language")
-    return preferred if preferred in {"en", "hi"} else "en"
+    return preferred if preferred in {"en", "hi", "te"} else "en"
 
 
 def choose_reply_language(transcript: Transcript) -> str:
