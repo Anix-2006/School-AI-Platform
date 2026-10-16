@@ -79,6 +79,63 @@ Speech-to-text runs behind a process-local FIFO queue in each uvicorn worker:
 The queue is not shared across workers or hosts. Run a single worker for the
 workbook-backed demo, as elsewhere in this guide.
 
+## Voice load test (issue #55)
+
+Load-test the real HTTP API (`POST /voice/chat`) with concurrent multipart
+uploads. Do not call Whisper in-process from the script.
+
+### Prerequisites
+
+1. App running with **one** uvicorn worker, `VOICE_ENABLED=true`, and
+   `/voice/status` → `ready`.
+2. Demo workbook guardians with consent (aliases `parent-a` … `parent-e`).
+3. Approved clips in `tests/fixtures/voice_load/` (synthetic WAVs) or
+   `--clips-dir` pointing at other authorized test audio — never real parents'
+   recordings without authorization.
+4. Optional: Docker Compose service `api` for container CPU/memory via
+   `docker stats`.
+
+### Commands
+
+```powershell
+# Preflight (no audio upload)
+python -m app.voice.loadtest --concurrent 5 --dry-run
+
+# Measured bursts (run separately; settle pause is built-in)
+python -m app.voice.loadtest --concurrent 5 --warmup 1
+python -m app.voice.loadtest --concurrent 10 --warmup 1
+python -m app.voice.loadtest --concurrent 20 --warmup 1
+```
+
+Overrides: `--base-url`, `--endpoint` (default `/voice/chat`), `--timeout`,
+`--output-dir`, `--docker-container`, `--clips-dir`, `--token` /
+`LOADTEST_TOKEN`, `LOADTEST_BASE_URL`.
+
+### Outputs
+
+Each run writes **new** timestamped files under `benchmark_results/` (gitignored):
+
+- `load-<utc>-cN-<run_id>.csv` — per-request timings
+- `resources-<utc>-cN-<run_id>.csv` — container samples when Docker works
+- `summary-<utc>-cN-<run_id>.json` — machine-readable summary
+
+`queue_wait_seconds` is server `timings_ms.queue / 1000` when present; otherwise
+`NA`. Client `total_seconds` is wall time and is never used as fake queue wait.
+
+Decision write-up template: [docs/voice-load-test-report.md](docs/voice-load-test-report.md).
+
+### Illustrative (not measured) reading of a summary
+
+```text
+Concurrency 5
+  successes:     5
+  median total:  2.4s          # example only
+  avg queue wait: 0.8s (n=5)   # example only
+```
+
+Replace with values from your CSVs. GPU comparison requires a CUDA host; until
+then mark it **NOT RUN** in the report.
+
 ## Voice startup and browser requirements
 
 When voice is enabled, the API starts immediately and downloads/loads Whisper
