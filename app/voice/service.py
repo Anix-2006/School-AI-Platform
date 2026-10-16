@@ -183,6 +183,55 @@ class VoiceService:
         finally:
             self._slots.release()
 
+    async def reply_text(
+        self,
+        *,
+        tenant_id: str,
+        guardian: dict,
+        student: dict,
+        audio: bytes,
+        content_type: str,
+        channel: str,
+        thread_id: str,
+    ) -> dict:
+        """Transcribe one recorded message and answer it as text (no speech
+        synthesis), on the caller's channel and conversation thread."""
+        self.check_rate("chat", guardian["id"])
+        try:
+            await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
+        except TimeoutError:
+            raise VoiceError(429, "Voice service is busy; please try again") from None
+        try:
+            transcript = await asyncio.to_thread(
+                self.stt.transcribe, audio, content_type, None, _initial_prompt(student)
+            )
+            reply_language = choose_reply_language(transcript)
+            if transcript.duration is not None and transcript.duration > self.max_seconds:
+                raise VoiceError(413, f"Audio exceeds the {self.max_seconds:g} second limit")
+            if _is_unusable_transcript(transcript):
+                language = (
+                    reply_language if transcript.text.strip() else _voice_language(None, guardian)
+                )
+                return {
+                    "reply": _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"]),
+                    "transcript": transcript.text,
+                    "agent_used": None,
+                    "language": language,
+                }
+            result = await asyncio.to_thread(
+                run_parent_turn,
+                tenant_id,
+                guardian,
+                student,
+                transcript.text,
+                channel,
+                thread_id,
+                reply_language,
+            )
+            return {**result, "language": reply_language, "transcript": transcript.text}
+        finally:
+            self._slots.release()
+
     async def _friendly_retry(
         self,
         transcript: Transcript,
