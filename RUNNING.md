@@ -34,10 +34,18 @@ voice model, limits, and audio cache in one process. Close
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
 - `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
-- `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
+- `VOICE_MAX_PARALLEL=1`: maximum simultaneous Whisper transcriptions (CPU
+  default). `VOICE_MAX_CONCURRENCY` is a legacy alias used only when
+  `VOICE_MAX_PARALLEL` is unset.
+- `VOICE_QUEUE_MAX=16`: maximum *waiting* transcription jobs (not counting
+  active ones). When full, the parent gets a localized busy/retry reply and
+  the job is not transcribed.
+- `VOICE_QUEUE_NOTIFY_AT=2`: after a job is admitted, if the waiting count
+  (waiting only) is at least this value, send one short localized
+  "processing" status. Active transcriptions are not counted.
 - `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
-- `VOICE_QUEUE_TIMEOUT=2.0`: seconds to wait for a voice job slot.
+- `VOICE_QUEUE_TIMEOUT=2.0`: legacy; admission uses `VOICE_QUEUE_MAX` instead.
 - `VOICE_GUARDIAN_RATE=10`: voice-chat requests per guardian per 60 seconds.
 - `VOICE_GLOBAL_RATE=60`: all voice chat and speak requests per process per
   60 seconds.
@@ -50,6 +58,83 @@ voice model, limits, and audio cache in one process. Close
   still present.
 
 Restart the service after changing environment variables.
+
+## Voice transcription queue
+
+Speech-to-text runs behind a process-local FIFO queue in each uvicorn worker:
+
+1. A job is admitted if either an active STT slot is free
+   (`active < VOICE_MAX_PARALLEL`) or there is waiting room
+   (`waiting < VOICE_QUEUE_MAX`).
+2. Waiting capacity does **not** include active transcriptions.
+3. Admitted jobs run Whisper one-after-another up to `VOICE_MAX_PARALLEL`.
+   Agent / TTS work happens after the STT slot is released.
+4. If waiting jobs after admission are `>= VOICE_QUEUE_NOTIFY_AT`, at most one
+   localized status phrase is sent via the configured notifier (HTTP responses
+   also expose `queue_notice` when that fires). Messaging failures do not free
+   or duplicate STT work.
+5. If the waiting queue is full, the API returns HTTP 429 with a localized busy
+   phrase; that audio is not transcribed.
+
+The queue is not shared across workers or hosts. Run a single worker for the
+workbook-backed demo, as elsewhere in this guide.
+
+## Voice load test (issue #55)
+
+Load-test the real HTTP API (`POST /voice/chat`) with concurrent multipart
+uploads. Do not call Whisper in-process from the script.
+
+### Prerequisites
+
+1. App running with **one** uvicorn worker, `VOICE_ENABLED=true`, and
+   `/voice/status` → `ready`.
+2. Demo workbook guardians with consent (aliases `parent-a` … `parent-e`).
+3. Approved clips in `tests/fixtures/voice_load/` (synthetic WAVs) or
+   `--clips-dir` pointing at other authorized test audio — never real parents'
+   recordings without authorization.
+4. Optional: Docker Compose service `api` for container CPU/memory via
+   `docker stats`.
+
+### Commands
+
+```powershell
+# Preflight (no audio upload)
+python -m app.voice.loadtest --concurrent 5 --dry-run
+
+# Measured bursts (run separately; settle pause is built-in)
+python -m app.voice.loadtest --concurrent 5 --warmup 1
+python -m app.voice.loadtest --concurrent 10 --warmup 1
+python -m app.voice.loadtest --concurrent 20 --warmup 1
+```
+
+Overrides: `--base-url`, `--endpoint` (default `/voice/chat`), `--timeout`,
+`--output-dir`, `--docker-container`, `--clips-dir`, `--token` /
+`LOADTEST_TOKEN`, `LOADTEST_BASE_URL`.
+
+### Outputs
+
+Each run writes **new** timestamped files under `benchmark_results/` (gitignored):
+
+- `load-<utc>-cN-<run_id>.csv` — per-request timings
+- `resources-<utc>-cN-<run_id>.csv` — container samples when Docker works
+- `summary-<utc>-cN-<run_id>.json` — machine-readable summary
+
+`queue_wait_seconds` is server `timings_ms.queue / 1000` when present; otherwise
+`NA`. Client `total_seconds` is wall time and is never used as fake queue wait.
+
+Decision write-up template: [docs/voice-load-test-report.md](docs/voice-load-test-report.md).
+
+### Illustrative (not measured) reading of a summary
+
+```text
+Concurrency 5
+  successes:     5
+  median total:  2.4s          # example only
+  avg queue wait: 0.8s (n=5)   # example only
+```
+
+Replace with values from your CSVs. GPU comparison requires a CUDA host; until
+then mark it **NOT RUN** in the report.
 
 ## Voice startup and browser requirements
 

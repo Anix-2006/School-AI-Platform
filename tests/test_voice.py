@@ -251,6 +251,9 @@ def test_pipeline_passes_content_type_student_prompt_and_timings(monkeypatch):
 
 
 def test_short_queue_rejects_excess_concurrency(monkeypatch):
+    """Waiting queue full → localized busy; no unbounded STT overlap."""
+    import threading
+
     from app.voice import service as module
 
     monkeypatch.setattr(
@@ -258,8 +261,24 @@ def test_short_queue_rejects_excess_concurrency(monkeypatch):
         "run_parent_turn",
         lambda *_args: {"reply": "Answer", "student_id": "s-1", "language": "en"},
     )
+    hold = threading.Event()
+    entered = threading.Event()
+
+    class HoldStt(FakeStt):
+        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+            self.calls += 1
+            entered.set()
+            hold.wait(timeout=2)
+            return self.result
+
     service = VoiceService(
-        FakeStt(delay=0.08), FakeTts(), AudioStore(), max_concurrency=1, queue_timeout=0.01
+        HoldStt(),
+        FakeTts(),
+        AudioStore(),
+        max_parallel=1,
+        queue_max=0,
+        guardian_rate=1000,
+        global_rate=1000,
     )
     kwargs = {
         "tenant_id": "t-1",
@@ -270,12 +289,14 @@ def test_short_queue_rejects_excess_concurrency(monkeypatch):
         "language": "en",
         "session_id": None,
     }
+
     async def run():
         first = asyncio.create_task(service.chat(**kwargs))
-        await asyncio.sleep(0.005)
+        await asyncio.to_thread(entered.wait, 2)
         with pytest.raises(VoiceError) as busy:
-            await service.chat(**kwargs)
+            await service.chat(**{**kwargs, "guardian": {"id": "g-2"}})
         assert busy.value.status_code == 429
+        hold.set()
         await first
 
     asyncio.run(run())
