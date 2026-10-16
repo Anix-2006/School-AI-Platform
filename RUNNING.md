@@ -35,7 +35,9 @@ voice model, limits, and audio cache in one process. Close
 - `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
 - `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
-- `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
+- `VOICE_MAX_SECONDS=60` and `VOICE_MAX_BYTES=5242880`: duration and size
+  limits for in-app voice uploads and WhatsApp voice notes. Both must be
+  positive.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
 - `VOICE_QUEUE_TIMEOUT=2.0`: seconds to wait for a voice job slot.
 - `VOICE_GUARDIAN_RATE=10`: voice-chat requests per guardian per 60 seconds.
@@ -65,6 +67,22 @@ Remote deployments must use HTTPS and the user must grant microphone access.
 The hands-free UI at `/flows/voice-assistant` prefers low-bitrate mono
 WebM/Opus, then MP4/AAC for Safari, then Ogg/Opus. Browser and OS support
 varies. The API also validates WAV and MP3 uploads.
+
+## WhatsApp voice notes
+
+The WhatsApp webhook accepts `audio` messages when voice is enabled and
+`/voice/status` is `ready`. The sender must pass the same school, guardian, and
+consent checks as text messages; otherwise nothing is downloaded and no reply
+is sent. Accepted notes are downloaded from the WhatsApp media API with
+`WHATSAPP_TOKEN`, checked against `VOICE_MAX_BYTES` and `VOICE_MAX_SECONDS`,
+converted to 16 kHz mono WAV, transcribed, and answered as a text reply in the
+same conversation as the parent's WhatsApp text messages.
+
+Conversion needs the `ffmpeg` executable on `PATH` (the Docker image installs
+it). On Windows, `winget install Gyan.FFmpeg`, then open a new terminal and
+check `ffmpeg -version`. On macOS use `brew install ffmpeg`; on Debian/Ubuntu
+use `sudo apt-get install ffmpeg`. Without FFmpeg, voice notes get a
+"temporarily unavailable" reply and text messages keep working.
 
 ## Manual checks
 

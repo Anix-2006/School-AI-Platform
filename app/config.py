@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,8 +32,9 @@ class Settings(BaseSettings):
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
     voice_max_concurrency: int = 1
-    voice_max_seconds: float = 30
-    voice_max_bytes: int = 5_242_880
+    # Limits for in-app voice uploads and WhatsApp voice notes.
+    voice_max_seconds: float = Field(60, gt=0)
+    voice_max_bytes: int = Field(5_242_880, gt=0)
     tts_cache_size: int = 128
     voice_queue_timeout: float = 2.0
     voice_guardian_rate: int = 10
