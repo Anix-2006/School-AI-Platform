@@ -21,7 +21,7 @@ from app.voice.storage import AudioStore
 
 class FakeStt:
     def __init__(self, text="Any homework?", language="hi", delay=0):
-        self.result = Transcript(text, language, 1.0, 1.0)
+        self.result = Transcript(text, language, duration_seconds=1.0, confidence=1.0)
         self.calls = 0
         self.arguments = []
         self.delay = delay
@@ -29,9 +29,9 @@ class FakeStt:
     def load(self):
         return None
 
-    def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+    def transcribe(self, audio_wav, language=None, *, initial_prompt=None):
         self.calls += 1
-        self.arguments.append((content_type, language, initial_prompt))
+        self.arguments.append((language, initial_prompt))
         time.sleep(self.delay)
         return self.result
 
@@ -41,7 +41,7 @@ class FakeTts:
         self.fail = fail
         self.calls = []
 
-    async def synthesize(self, text, language):
+    def speak(self, text, language):
         self.calls.append((text, language))
         if self.fail:
             raise RuntimeError("offline")
@@ -91,7 +91,7 @@ def test_cleaner_makes_school_content_speakable():
     ],
 )
 def test_reply_language_is_chosen_per_turn(text, detected, expected):
-    assert choose_reply_language(Transcript(text, detected, 1, 1)) == expected
+    assert choose_reply_language(Transcript(text, detected, 1.0, confidence=1.0)) == expected
 
 
 def test_audio_validation_is_in_memory_and_bounded():
@@ -144,11 +144,13 @@ def test_audio_store_enforces_owner_expiry_and_one_download():
 def test_silence_and_repetition_are_detected():
     from app.voice.service import _is_unusable_transcript
 
-    assert _is_unusable_transcript(Transcript("", "en", 1, 1))
-    assert _is_unusable_transcript(Transcript("hello there", "en", 0.1, 1))
-    assert _is_unusable_transcript(Transcript("yes yes yes yes yes", "en", 1, 1))
-    assert not _is_unusable_transcript(Transcript("Homework?", "en", 1, 1))
-    assert not _is_unusable_transcript(Transcript("what is the homework today", "en", 1, 1))
+    assert _is_unusable_transcript(Transcript("", "en", 1.0, confidence=1.0))
+    assert _is_unusable_transcript(Transcript("hello there", "en", 1.0, confidence=0.1))
+    assert _is_unusable_transcript(Transcript("yes yes yes yes yes", "en", 1.0, confidence=1.0))
+    assert not _is_unusable_transcript(Transcript("Homework?", "en", 1.0, confidence=1.0))
+    assert not _is_unusable_transcript(
+        Transcript("what is the homework today", "en", 1.0, confidence=1.0)
+    )
 
 
 def test_tts_failure_degrades_to_text(monkeypatch):
@@ -175,7 +177,7 @@ def test_tts_failure_degrades_to_text(monkeypatch):
     assert result["reply"] == "**Answer**"
     assert result["tts_degraded"] is True
     assert result["audio_id"] is None
-    assert stt.arguments[0][1] is None
+    assert stt.arguments[0][0] == "en"
     assert result["language"] == "en"
 
 
@@ -210,25 +212,25 @@ def test_silence_returns_localized_reply_without_llm(monkeypatch):
     assert tts.calls
 
 
-def test_pipeline_passes_content_type_student_prompt_and_timings(monkeypatch):
+def test_pipeline_passes_language_student_prompt_and_timings(monkeypatch):
     from app.voice import service as module
 
     calls = []
     stt = FakeStt()
     original_transcribe = stt.transcribe
 
-    def transcribe(*args):
+    def transcribe(*args, **kwargs):
         calls.append("stt")
-        return original_transcribe(*args)
+        return original_transcribe(*args, **kwargs)
 
     def llm(*_args):
         calls.append("llm")
         return {"reply": "Answer", "student_id": "s-1", "language": "hi"}
 
     class OrderedTts(FakeTts):
-        async def synthesize(self, text, language):
+        def speak(self, text, language):
             calls.append("tts")
-            return await super().synthesize(text, language)
+            return super().speak(text, language)
 
     stt.transcribe = transcribe
     monkeypatch.setattr(module, "run_parent_turn", llm)
@@ -245,8 +247,8 @@ def test_pipeline_passes_content_type_student_prompt_and_timings(monkeypatch):
         )
     )
     assert calls == ["stt", "llm", "tts"]
-    assert stt.arguments[0][0:2] == ("audio/ogg", None)
-    assert "Ananya" in stt.arguments[0][2]
+    assert stt.arguments[0][0] == "hi"
+    assert "Ananya" in (stt.arguments[0][1] or "")
     assert all(key in result["timings"] for key in ("stt", "llm", "tts", "total"))
 
 

@@ -7,11 +7,12 @@ import threading
 import time
 from collections import defaultdict, deque
 
+from app.config import settings
 from app.services.chat_service import run_parent_turn
 from app.voice.speech_text import clean_for_speech
-from app.voice.stt import SttEngine, Transcript
+from app.voice.stt import SpeechToText, Transcript
 from app.voice.storage import AudioStore
-from app.voice.tts import TtsEngine
+from app.voice.tts import TextToSpeech
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,8 @@ class SlidingRateLimiter:
 class VoiceService:
     def __init__(
         self,
-        stt: SttEngine,
-        tts: TtsEngine,
+        stt: SpeechToText,
+        tts: TextToSpeech,
         audio_store: AudioStore,
         *,
         max_concurrency: int = 1,
@@ -53,6 +54,7 @@ class VoiceService:
         global_rate: int = 60,
         speak_rate: int = 20,
         max_seconds: float = 30.0,
+        tts_timeout: float | None = None,
     ):
         self.stt = stt
         self.tts = tts
@@ -62,6 +64,9 @@ class VoiceService:
         self.global_rate = global_rate
         self.speak_rate = speak_rate
         self.max_seconds = max_seconds
+        self.tts_timeout = (
+            settings.voice_tts_timeout if tts_timeout is None else tts_timeout
+        )
         self._slots = asyncio.Semaphore(max(1, max_concurrency))
         self._rates = SlidingRateLimiter()
 
@@ -95,14 +100,15 @@ class VoiceService:
         queued = time.perf_counter()
         try:
             prompt = _initial_prompt(student)
+            stt_language = _stt_language(language, guardian)
             transcript = await asyncio.to_thread(
-                self.stt.transcribe, audio, content_type, None, prompt
+                self._transcribe, audio, stt_language, prompt
             )
             transcribed = time.perf_counter()
             reply_language = choose_reply_language(transcript)
             if (
-                transcript.duration is not None
-                and transcript.duration > self.max_seconds
+                transcript.duration_seconds is not None
+                and transcript.duration_seconds > self.max_seconds
             ):
                 raise VoiceError(413, f"Audio exceeds the {self.max_seconds:g} second limit")
             if _is_unusable_transcript(transcript):
@@ -133,10 +139,7 @@ class VoiceService:
             )
             replied = time.perf_counter()
             spoken_text = clean_for_speech(result["reply"], reply_language)
-            try:
-                speech = await self.tts.synthesize(spoken_text, reply_language)
-            except Exception:
-                speech = b""
+            speech = await self._speak(spoken_text, reply_language)
             finished = time.perf_counter()
             audio_id = (
                 self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
@@ -198,10 +201,7 @@ class VoiceService:
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
-        try:
-            speech = await self.tts.synthesize(reply, language)
-        except Exception:
-            speech = b""
+        speech = await self._speak(reply, language)
         finished = time.perf_counter()
         timings_ms = {
             "upload": upload_ms,
@@ -244,11 +244,40 @@ class VoiceService:
         if not cleaned:
             raise VoiceError(422, "Text has no speakable content")
         try:
-            return await self.tts.synthesize(cleaned, language)
+            speech = await self._speak(cleaned, language, degrade=False)
         except ValueError as exc:
             raise VoiceError(422, str(exc)) from None
         except Exception:
             raise VoiceError(503, "Text-to-speech is temporarily unavailable") from None
+        if not speech:
+            raise VoiceError(503, "Text-to-speech is temporarily unavailable")
+        return speech
+
+    def _transcribe(
+        self, audio: bytes, language: str | None, initial_prompt: str | None
+    ) -> Transcript:
+        # WhisperSTT accepts initial_prompt; plain Protocol fakes may ignore it.
+        try:
+            return self.stt.transcribe(  # type: ignore[call-arg]
+                audio, language, initial_prompt=initial_prompt
+            )
+        except TypeError:
+            return self.stt.transcribe(audio, language)
+
+    async def _speak(
+        self, text: str, language: str, *, degrade: bool = True
+    ) -> bytes:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self.tts.speak, text, language),
+                timeout=self.tts_timeout,
+            )
+        except ValueError:
+            raise
+        except Exception:
+            if degrade:
+                return b""
+            raise
 
     def close(self) -> None:
         close = getattr(self.tts, "close", None)
@@ -276,6 +305,14 @@ def _voice_language(override: str | None, guardian: dict) -> str:
         return override
     preferred = guardian.get("preferred_language")
     return preferred if preferred in {"en", "hi"} else "en"
+
+
+def _stt_language(override: str | None, guardian: dict) -> str | None:
+    """Pass a language to Whisper when known so it skips detection."""
+    if override in {"en", "hi", "te"}:
+        return override
+    preferred = guardian.get("preferred_language")
+    return preferred if preferred in {"en", "hi", "te"} else None
 
 
 def choose_reply_language(transcript: Transcript) -> str:
