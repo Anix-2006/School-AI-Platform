@@ -17,6 +17,11 @@ _HINDI_MONTHS = (
 ).split()
 
 
+def to_speech_text(text: str, language: str = "en") -> str:
+    """Remove markdown, bullets, tables, links and emojis before TTS."""
+    return clean_for_speech(text, language=language)
+
+
 def clean_for_speech(
     text: str, language: str = "en", max_chars: int = MAX_SPEECH_CHARS
 ) -> str:
