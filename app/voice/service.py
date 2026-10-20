@@ -9,6 +9,7 @@ from collections import defaultdict, deque
 
 from app.config import settings
 from app.services.chat_service import run_parent_turn
+from app.voice.constants import COULD_NOT_HEAR
 from app.voice.speech_text import clean_for_speech
 from app.voice.stt import SpeechToText, Transcript
 from app.voice.storage import AudioStore
@@ -285,10 +286,7 @@ class VoiceService:
             close()
 
 
-_RETRY_REPLIES = {
-    "en": "I could not hear a clear question. Please try again.",
-    "hi": "मुझे सवाल साफ़ सुनाई नहीं दिया। कृपया फिर से बोलें।",
-}
+_RETRY_REPLIES = COULD_NOT_HEAR
 
 
 def _initial_prompt(student: dict) -> str:
