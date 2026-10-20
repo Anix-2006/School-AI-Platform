@@ -6,35 +6,40 @@ import wave
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.config import settings
+
 
 @dataclass(frozen=True)
 class Transcript:
     text: str
     language: str | None
-    confidence: float
-    duration: float | None
+    duration_seconds: float | None
+    # Used by the voice service to reject silence / low-quality guesses.
+    confidence: float = 1.0
 
 
-class SttEngine(Protocol):
+class SpeechToText(Protocol):
     def load(self) -> None: ...
-    def warmup(self) -> None: ...
 
     def transcribe(
         self,
-        audio_bytes: bytes,
-        content_type: str,
+        audio_wav: bytes,
         language: str | None = None,
-        initial_prompt: str | None = None,
     ) -> Transcript: ...
 
 
-class FasterWhisperEngine:
-    """Lazy import with one model instance per runtime."""
+class WhisperSTT:
+    """faster-whisper implementation. One model instance per process."""
 
-    def __init__(self, model_name: str, device: str = "cpu", compute_type: str = "int8"):
-        self.model_name = model_name
-        self.device = device
-        self.compute_type = compute_type
+    def __init__(
+        self,
+        model_name: str | None = None,
+        device: str | None = None,
+        compute_type: str | None = None,
+    ):
+        self.model_name = model_name or settings.whisper_model
+        self.device = device or settings.whisper_device
+        self.compute_type = compute_type or settings.whisper_compute_type
         self._model = None
         self._load_lock = threading.Lock()
 
@@ -46,7 +51,9 @@ class FasterWhisperEngine:
                 from faster_whisper import WhisperModel
 
                 self._model = WhisperModel(
-                    self.model_name, device=self.device, compute_type=self.compute_type
+                    self.model_name,
+                    device=self.device,
+                    compute_type=self.compute_type,
                 )
 
     def warmup(self) -> None:
@@ -71,33 +78,59 @@ class FasterWhisperEngine:
 
     def transcribe(
         self,
-        audio_bytes: bytes,
-        content_type: str,
+        audio_wav: bytes,
         language: str | None = None,
+        *,
         initial_prompt: str | None = None,
     ) -> Transcript:
         self.load()
-        segments, info = self._model.transcribe(
-            io.BytesIO(audio_bytes),
-            language=language,
-            initial_prompt=initial_prompt,
-            vad_filter=True,
-            beam_size=1,
-            best_of=1,
-            temperature=0,
-            condition_on_previous_text=False,
-        )
+        # Pass language when known so Whisper skips detection; detect only when missing.
+        kwargs: dict = {
+            "vad_filter": True,
+            "beam_size": 1,
+            "best_of": 1,
+            "temperature": 0,
+            "condition_on_previous_text": False,
+        }
+        if language:
+            kwargs["language"] = language
+        if initial_prompt:
+            kwargs["initial_prompt"] = initial_prompt
+        segments, info = self._model.transcribe(io.BytesIO(audio_wav), **kwargs)
         parts = list(segments)
-        text = " ".join(segment.text.strip() for segment in parts if segment.text.strip()).strip()
+        text = " ".join(
+            segment.text.strip() for segment in parts if segment.text.strip()
+        ).strip()
         confidence = 1.0 - (
             sum(float(getattr(segment, "no_speech_prob", 0.0)) for segment in parts)
             / len(parts)
             if parts
             else 1.0
         )
+        detected = getattr(info, "language", None)
         return Transcript(
             text=text,
-            language=getattr(info, "language", language),
+            language=detected or language,
+            duration_seconds=getattr(info, "duration", None),
             confidence=max(0.0, min(1.0, confidence)),
-            duration=getattr(info, "duration", None),
         )
+
+
+_stt: WhisperSTT | None = None
+_stt_lock = threading.Lock()
+
+
+def get_stt() -> WhisperSTT:
+    """The single shared speech-to-text engine (same pattern as get_store())."""
+    global _stt
+    if _stt is None:
+        with _stt_lock:
+            if _stt is None:
+                _stt = WhisperSTT()
+    return _stt
+
+
+def reset_stt_for_tests() -> None:
+    global _stt
+    with _stt_lock:
+        _stt = None
