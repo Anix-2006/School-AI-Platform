@@ -40,7 +40,14 @@ class Settings(BaseSettings):
     voice_speak_rate: int = 20
     voice_tts_timeout: float = 4.0
     voice_audio_ttl: float = 300.0
+    # Live conversation. Silence closes an utterance, VOICE_MAX_SECONDS caps it,
+    # and sensitivity is the WebRTC VAD mode: 0 keeps quiet speech, 3 rejects more noise.
     voice_vad_silence_ms: int = 800
+    voice_vad_sensitivity: int = 2
+    voice_vad_frame_ms: int = 30
+    voice_vad_preroll_ms: int = 300
+    voice_vad_min_speech_ms: int = 300
+    voice_vad_sample_rate: int = 16000
     voice_idle_prompt_seconds: int = 20
 
 

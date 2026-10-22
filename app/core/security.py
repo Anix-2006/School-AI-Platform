@@ -18,6 +18,18 @@ def create_access_token(data: dict, expires_minutes: int = 60 * 8) -> str:
     return jwt.encode(to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+def decode_raw_token(token: str) -> dict:
+    """Decode a bearer token that did not come from the Authorization header."""
+    try:
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+
+
 def decode_token(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> dict:
     if credentials is None:
         raise HTTPException(
