@@ -144,7 +144,8 @@ class ExcelStore:
                     if ws.title == "guardians":
                         for record in records:
                             language = record.get("preferred_language")
-                            if language not in {"en", "hi"}:
+                            # Voice can speak English, Hindi, and Telugu. Anything else is English.
+                            if language not in {"en", "hi", "te"}:
                                 logger.warning(
                                     "Guardian %s has unsupported preferred_language; using en",
                                     record.get("id"),

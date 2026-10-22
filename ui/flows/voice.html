@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice — School Parent AI</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="parent-body">
+<header class="topbar parent-topbar">
+  <button type="button" class="menu-btn" id="openSidebar" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <a class="topbar-brand" href="/">School Parent AI</a>
+  <span class="topbar-spacer"></span>
+</header>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<aside class="sidebar" id="sidebar" aria-label="App pages">
+  <div class="sidebar-header"><h2>Pages</h2><button type="button" class="close-btn" id="closeSidebar" aria-label="Close sidebar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+  <div id="app-nav"></div>
+</aside>
+
+<main class="page voice-demo-page">
+  <div class="parent-page-heading">
+    <div>
+      <p class="eyebrow">Parent channel</p>
+      <h1>Voice</h1>
+      <p class="lead">Choose a parent, hold the button, and ask a question. The page shows what was heard and plays the spoken answer. Microphone access works on localhost; any other host needs HTTPS.</p>
+    </div>
+  </div>
+
+  <section class="panel voice-demo-panel">
+    <label for="guardian">Parent</label>
+    <select id="guardian"><option value="">Loading parents…</option></select>
+    <p class="meta" id="childContext"></p>
+    <button type="button" class="primary voice-demo-record" id="record" aria-pressed="false" disabled>Hold to talk</button>
+    <p class="voice-demo-timer" id="timer" data-max-seconds="__VOICE_MAX_SECONDS__">0:00 <span class="meta">/ 0:00</span></p>
+  </section>
+
+  <section class="panel" aria-live="polite">
+    <p class="voice-demo-heard" id="heardLine"><strong>Heard:</strong> <span id="heard">—</span></p>
+    <p class="voice-demo-reply" id="reply"></p>
+    <audio class="voice-demo-player" id="player" controls hidden></audio>
+  </section>
+  <p id="voiceError" class="error" role="alert" hidden></p>
+</main>
+<script src="/nav.js"></script>
+<script src="/sidebar.js"></script>
+<script src="/api.js"></script>
+<script>
+(() => {
+  "use strict";
+
+  const HOLD_MS = 280;
+  const guardianSelect = document.getElementById("guardian");
+  const recordButton = document.getElementById("record");
+  const timer = document.getElementById("timer");
+  const configuredLimit = Number.parseFloat(timer.dataset.maxSeconds);
+  const MAX_SECONDS = Number.isFinite(configuredLimit) && configuredLimit > 0 ? configuredLimit : 30;
+  // Stop slightly before the server limit so encoding and upload still fit.
+  const EARLY_STOP_SECONDS = Math.min(0.75, MAX_SECONDS / 4);
+  const STOP_SECONDS = MAX_SECONDS - EARLY_STOP_SECONDS;
+  const MAX_MS = STOP_SECONDS * 1000;
+  const childContext = document.getElementById("childContext");
+  const heard = document.getElementById("heard");
+  const reply = document.getElementById("reply");
+  const player = document.getElementById("player");
+  const errorBox = document.getElementById("voiceError");
+  const sessionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `voice-${Date.now()}`;
+
+  let guardians = [];
+  let mode = "idle";
+  let hold = false;
+  let ignoreClick = false;
+  let delivering = false;
+  let holdTimer = 0;
+  let tickTimer = 0;
+  let limitTimer = 0;
+  let recorder = null;
+  let stream = null;
+  let chunks = [];
+  let startedAt = 0;
+  // "prompt" still allows a click to ask. "denied" and "unsupported" keep the button off.
+  let microphonePermission = "unknown";
+
+  function selectedGuardian() {
+    return guardians.find((item) => String(item.id) === guardianSelect.value) || null;
+  }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    errorBox.textContent = "";
+    errorBox.hidden = true;
+  }
+
+  function formatClock(totalSeconds) {
+    const whole = Math.max(0, Math.round(totalSeconds));
+    const minutes = Math.floor(whole / 60);
+    const seconds = whole % 60;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function formatTime(elapsed) {
+    const capped = Math.min(MAX_MS, Math.max(0, elapsed)) / 1000;
+    return formatClock(capped);
+  }
+
+  function paintTimer(elapsed) {
+    timer.replaceChildren(document.createTextNode(`${formatTime(elapsed)} `));
+    const limit = document.createElement("span");
+    limit.className = "meta";
+    limit.textContent = `/ ${formatClock(MAX_SECONDS)}`;
+    timer.appendChild(limit);
+  }
+
+  function resetButton() {
+    mode = "idle";
+    delivering = false;
+    guardianSelect.disabled = false;
+    recordButton.disabled = !canRecord();
+    recordButton.textContent = "Hold to talk";
+    recordButton.setAttribute("aria-pressed", "false");
+    paintTimer(0);
+  }
+
+  function microphoneApis() {
+    return window.isSecureContext
+      && typeof navigator.mediaDevices?.getUserMedia === "function"
+      && typeof window.MediaRecorder === "function";
+  }
+
+  function canRecord() {
+    const guardian = selectedGuardian();
+    const permissionOk = microphonePermission === "granted" || microphonePermission === "prompt";
+    return Boolean(guardian && guardian.has_consent && microphoneApis() && permissionOk);
+  }
+
+  function syncGuardian() {
+    const guardian = selectedGuardian();
+    if (!guardian) {
+      childContext.textContent = "";
+      recordButton.disabled = true;
+      return;
+    }
+    const section = guardian.section ? `-${guardian.section}` : "";
+    childContext.textContent = `${guardian.student_name}, ${guardian.grade || ""}${section}`.replace(/, $/, "");
+    if (!guardian.has_consent) {
+      recordButton.disabled = true;
+      showError(`${guardian.name} has not given consent yet, so the assistant can't listen.`);
+      return;
+    }
+    if (!microphoneApis()) {
+      recordButton.disabled = true;
+      showError("This browser cannot record audio. Open the page on http://localhost or HTTPS.");
+      return;
+    }
+    if (microphonePermission === "denied") {
+      recordButton.disabled = true;
+      showError("Microphone permission is needed. Allow the microphone for this page and try again.");
+      return;
+    }
+    if (microphonePermission !== "granted" && microphonePermission !== "prompt") {
+      recordButton.disabled = true;
+      return;
+    }
+    if (mode === "idle") recordButton.disabled = false;
+    clearError();
+  }
+
+  function watchMicrophone() {
+    if (!microphoneApis()) {
+      microphonePermission = "unsupported";
+      return Promise.resolve();
+    }
+    if (!navigator.permissions?.query) {
+      microphonePermission = "prompt";
+      return Promise.resolve();
+    }
+    return navigator.permissions.query({ name: "microphone" }).then((status) => {
+      microphonePermission = status.state;
+      status.onchange = () => {
+        microphonePermission = status.state;
+        if (mode === "idle") syncGuardian();
+      };
+    }).catch(() => {
+      microphonePermission = "prompt";
+    });
+  }
+
+  function stopTracks() {
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = null;
+  }
+
+  function messageFor(status, data) {
+    const detail = data && typeof data.detail === "string" ? data.detail : "";
+    if (status === 403) return detail || "This parent has not given consent, so the assistant can't listen.";
+    if (status === 404) {
+      if (/consent|guardian|parent/i.test(detail)) return detail;
+      return detail && !/^not found$/i.test(detail)
+        ? detail
+        : "Voice is turned off. Set VOICE_ENABLED=true and restart the school service.";
+    }
+    if (status === 413) return detail || "That recording is too long or too large. Try a shorter question.";
+    if (status === 415) return detail || "This recording format is not supported.";
+    if (status === 503) return detail || "Voice is still starting. Wait a moment and try again.";
+    return detail || "The assistant could not answer. Please try again.";
+  }
+
+  async function sendRecording() {
+    const blob = new Blob(chunks, { type: recorder?.mimeType || "audio/webm" });
+    chunks = [];
+    recorder = null;
+    if (!blob.size) {
+      showError("Nothing was recorded. Hold the button a little longer and try again.");
+      resetButton();
+      return;
+    }
+    const guardian = selectedGuardian();
+    if (!guardian) {
+      showError("Choose a parent first.");
+      resetButton();
+      return;
+    }
+    const form = new FormData();
+    form.append("guardian_id", guardian.id);
+    form.append("session_id", sessionId);
+    form.append("audio", blob, "question.webm");
+    try {
+      await window.SchoolAPI.ensureAuth();
+      const response = await fetch("/voice", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${window.SchoolAPI.state.token}` },
+        body: form,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showError(messageFor(response.status, data));
+        heard.textContent = "—";
+        reply.textContent = "";
+        player.hidden = true;
+        player.removeAttribute("src");
+        resetButton();
+        return;
+      }
+      heard.textContent = data.transcript || "—";
+      reply.textContent = data.reply || "";
+      if (data.audio_base64) {
+        player.hidden = false;
+        player.src = `data:audio/mpeg;base64,${data.audio_base64}`;
+        player.play().catch(() => {});
+      } else {
+        player.hidden = true;
+        player.removeAttribute("src");
+      }
+      clearError();
+    } catch {
+      showError("The voice request could not be sent. Check the connection and try again.");
+    }
+    resetButton();
+  }
+
+  function deliverRecording() {
+    if (delivering) return;
+    delivering = true;
+    stopTracks();
+    sendRecording();
+  }
+
+  function stopRecording() {
+    if (mode !== "recording") return;
+    window.clearInterval(tickTimer);
+    window.clearTimeout(limitTimer);
+    mode = "sending";
+    recordButton.disabled = true;
+    guardianSelect.disabled = true;
+    recordButton.textContent = "Sending…";
+    recordButton.setAttribute("aria-pressed", "false");
+    paintTimer(performance.now() - startedAt);
+    if (recorder && recorder.state === "recording") {
+      recorder.stop();
+      return;
+    }
+    deliverRecording();
+  }
+
+  async function startRecording() {
+    if (mode !== "idle") return;
+    if (!canRecord()) {
+      syncGuardian();
+      return;
+    }
+    mode = "starting";
+    recordButton.disabled = true;
+    let media;
+    try {
+      media = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error) {
+      mode = "idle";
+      const denied = error && (error.name === "NotAllowedError" || error.name === "SecurityError" || error.name === "PermissionDeniedError");
+      if (denied) microphonePermission = "denied";
+      syncGuardian();
+      if (!denied) showError("The microphone could not be started. Check that it is connected and try again.");
+      return;
+    }
+    if (mode !== "starting") {
+      media.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    stream = media;
+    const preferred = "audio/webm;codecs=opus";
+    const mime = MediaRecorder.isTypeSupported(preferred)
+      ? preferred
+      : (MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "");
+    try {
+      recorder = mime ? new MediaRecorder(media, { mimeType: mime }) : new MediaRecorder(media);
+    } catch {
+      stopTracks();
+      mode = "idle";
+      syncGuardian();
+      showError("This browser cannot record audio. Open the page on http://localhost or HTTPS.");
+      return;
+    }
+    chunks = [];
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data && event.data.size) chunks.push(event.data);
+    });
+    recorder.addEventListener("stop", () => {
+      deliverRecording();
+    });
+    recorder.start();
+    mode = "recording";
+    guardianSelect.disabled = true;
+    startedAt = performance.now();
+    recordButton.disabled = false;
+    recordButton.textContent = "Recording… release to send";
+    recordButton.setAttribute("aria-pressed", "true");
+    clearError();
+    paintTimer(0);
+    tickTimer = window.setInterval(() => paintTimer(performance.now() - startedAt), 200);
+    limitTimer = window.setTimeout(stopRecording, MAX_MS);
+  }
+
+  recordButton.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || mode === "sending" || mode === "starting") return;
+    hold = false;
+    window.clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => {
+      hold = true;
+      startRecording();
+    }, HOLD_MS);
+  });
+
+  function endHold() {
+    window.clearTimeout(holdTimer);
+    if (hold && (mode === "recording" || mode === "starting")) {
+      ignoreClick = true;
+      if (mode === "starting") {
+        mode = "idle";
+        guardianSelect.disabled = false;
+        recordButton.disabled = !canRecord();
+      } else {
+        stopRecording();
+      }
+    }
+    hold = false;
+  }
+
+  recordButton.addEventListener("pointerup", endHold);
+  recordButton.addEventListener("pointercancel", endHold);
+  recordButton.addEventListener("pointerleave", () => {
+    if (hold) endHold();
+  });
+  recordButton.addEventListener("click", () => {
+    if (ignoreClick) {
+      ignoreClick = false;
+      return;
+    }
+    if (mode === "recording") stopRecording();
+    else if (mode === "idle") startRecording();
+  });
+
+  guardianSelect.addEventListener("change", syncGuardian);
+  paintTimer(0);
+
+  Promise.all([
+    watchMicrophone(),
+    window.SchoolAPI.ensureAuth().then(() => window.SchoolAPI.fillGuardianSelect(guardianSelect)),
+  ])
+    .then(([, rows]) => {
+      guardians = rows;
+      syncGuardian();
+    })
+    .catch((error) => {
+      guardianSelect.replaceChildren();
+      showError(error.message || "Parents could not be loaded.");
+    });
+})();
+</script>
+</body>
+</html>

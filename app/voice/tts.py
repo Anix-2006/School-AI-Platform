@@ -14,7 +14,8 @@ class TtsEngine(Protocol):
 
 
 class GttsEngine:
-    SUPPORTED_LANGUAGES = {"en", "hi"}
+    # gTTS speaks these. Other guardian languages fall back to English.
+    SUPPORTED_LANGUAGES = {"en", "hi", "te"}
 
     def __init__(self, *, timeout: float = 12.0, cache_size: int = 128, workers: int = 4):
         self.timeout = timeout

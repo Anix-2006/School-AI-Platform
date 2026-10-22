@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import time
 from typing import Literal
 
@@ -13,7 +14,7 @@ from app.config import settings
 from app.core.security import decode_token
 from app.core.tenancy import get_current_tenant
 from app.services.chat_service import ChatAccessError, resolve_parent
-from app.voice.audio import AudioValidationError, validate_audio
+from app.voice.audio import AudioValidationError, convert_upload_to_wav, validate_audio
 from app.voice.service import VoiceError, audio_owner_key
 
 Language = Literal["en", "hi"]
@@ -51,6 +52,34 @@ class VoiceChatResponse(BaseModel):
     audio_id: str | None
     timings: VoiceTimings
     timings_ms: DetailedVoiceTimings
+
+
+class BrowserVoiceResponse(BaseModel):
+    transcript: str
+    reply: str
+    agent_used: str | None = None
+    language: str
+    audio_base64: str | None = None
+
+
+BROWSER_VOICE_REQUEST_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["audio", "guardian_id"],
+                    "properties": {
+                        "audio": {"type": "string", "format": "binary"},
+                        "guardian_id": {"type": "string"},
+                        "session_id": {"type": "string"},
+                    },
+                }
+            }
+        },
+    }
+}
 
 
 VOICE_CHAT_REQUEST_BODY = {
@@ -157,6 +186,66 @@ async def voice_chat(
         )
     except (AudioValidationError, VoiceError) as exc:
         raise HTTPException(exc.status_code, exc.detail) from None
+
+
+@router.post(
+    "",
+    response_model=BrowserVoiceResponse,
+    openapi_extra=BROWSER_VOICE_REQUEST_BODY,
+)
+async def browser_voice(
+    request: Request,
+    tenant_id: str = Depends(get_current_tenant),
+):
+    """Demo voice turn: guardian, consent, then the same listen-answer-speak flow."""
+    request_started = time.perf_counter()
+    fields, audio_bytes, _content_type = await _read_voice_multipart(request)
+    uploaded = time.perf_counter()
+    guardian_id = fields.get("guardian_id", "").strip()
+    session_id = fields.get("session_id", "").strip() or None
+    if not guardian_id:
+        raise HTTPException(422, "guardian_id is required")
+    # The student and language come from the guardian row. Consent is checked
+    # before any conversion or transcription.
+    try:
+        guardian, student = resolve_parent(tenant_id, guardian_id)
+    except ChatAccessError as exc:
+        raise HTTPException(exc.status_code, exc.detail) from None
+    if not audio_bytes:
+        raise HTTPException(422, "Audio is empty")
+    if len(audio_bytes) > settings.voice_max_bytes:
+        raise HTTPException(413, f"Audio exceeds the {settings.voice_max_bytes} byte limit")
+    service = _service(request)
+    try:
+        wav = convert_upload_to_wav(audio_bytes, max_seconds=settings.voice_max_seconds)
+        decoded = time.perf_counter()
+        result = await service.chat(
+            tenant_id=tenant_id,
+            guardian=guardian,
+            student=student,
+            audio=wav,
+            content_type="audio/wav",
+            language=None,
+            session_id=session_id,
+            upload_ms=round((uploaded - request_started) * 1000),
+            decode_ms=round((decoded - uploaded) * 1000),
+            lock_language=True,
+        )
+    except (AudioValidationError, VoiceError) as exc:
+        raise HTTPException(exc.status_code, exc.detail) from None
+    audio_id = result.get("audio_id")
+    speech = (
+        service.audio_store.take(audio_id, audio_owner_key(tenant_id, guardian["id"]))
+        if audio_id
+        else None
+    )
+    return BrowserVoiceResponse(
+        transcript=result["transcript"],
+        reply=result["reply"],
+        agent_used=result.get("agent_used"),
+        language=result["language"],
+        audio_base64=base64.b64encode(speech).decode("ascii") if speech else None,
+    )
 
 
 @router.get("/audio/{audio_id}")

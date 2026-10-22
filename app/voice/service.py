@@ -84,10 +84,17 @@ class VoiceService:
         session_id: str | None,
         upload_ms: int = 0,
         decode_ms: int = 0,
+        lock_language: bool = False,
     ) -> dict:
         self.check_rate("chat", guardian["id"])
         started = time.perf_counter()
         fallback_language = _voice_language(language, guardian)
+        if lock_language:
+            fallback_language = _speakable_language(fallback_language, self.tts)
+        elif fallback_language not in {"en", "hi"}:
+            # Transcript detection still chooses the reply for /voice/chat.
+            # Its empty-audio fallback stays English or Hindi.
+            fallback_language = "en"
         try:
             await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
         except TimeoutError:
@@ -99,7 +106,11 @@ class VoiceService:
                 self.stt.transcribe, audio, content_type, None, prompt
             )
             transcribed = time.perf_counter()
-            reply_language = choose_reply_language(transcript)
+            # The browser demo speaks in the guardian's language. Other callers
+            # still follow the transcript.
+            reply_language = (
+                fallback_language if lock_language else choose_reply_language(transcript)
+            )
             if (
                 transcript.duration is not None
                 and transcript.duration > self.max_seconds
@@ -259,6 +270,7 @@ class VoiceService:
 _RETRY_REPLIES = {
     "en": "I could not hear a clear question. Please try again.",
     "hi": "मुझे सवाल साफ़ सुनाई नहीं दिया। कृपया फिर से बोलें।",
+    "te": "ప్రశ్న స్పష్టంగా వినిపించలేదు. దయచేసి మళ్లీ మాట్లాడండి.",
 }
 
 
@@ -272,10 +284,24 @@ def _initial_prompt(student: dict) -> str:
 
 
 def _voice_language(override: str | None, guardian: dict) -> str:
-    if override in {"en", "hi"}:
-        return override
-    preferred = guardian.get("preferred_language")
-    return preferred if preferred in {"en", "hi"} else "en"
+    chosen = override or guardian.get("preferred_language") or "en"
+    code = str(chosen).strip().lower().split("-", 1)[0]
+    return code or "en"
+
+
+def _speakable_language(language: str, tts: object) -> str:
+    """Return a language this engine will actually speak.
+
+    English, Hindi, and Telugu are used when the engine lists them.
+    Any other language is spoken in English. Callers report this spoken
+    language, not the guardian's original choice.
+    """
+    supported = getattr(tts, "SUPPORTED_LANGUAGES", None) or {"en", "hi", "te"}
+    if language in supported:
+        return language
+    if "en" in supported:
+        return "en"
+    return next(iter(supported))
 
 
 def choose_reply_language(transcript: Transcript) -> str:

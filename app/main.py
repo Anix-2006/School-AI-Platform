@@ -1,13 +1,15 @@
 from pathlib import Path
 import asyncio
+import math
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 import logging
 
 from app.api import routes_chat, routes_students, routes_webhooks, routes_ops, routes_teachers, routes_voice
+from app.config import settings
 from app.core.security import create_access_token
 from app.services.excel_store import get_store
 from app.voice.runtime import VoiceRuntime
@@ -19,6 +21,7 @@ FLOW_PAGES = {
     "platform-overview",
     "parent-chat",
     "voice-assistant",
+    "voice",
     "ask-a-helper",
     "whatsapp",
     "daily-updates",
@@ -100,6 +103,17 @@ def voice_mascot(size: int):
     return FileResponse(UI_DIR / "assets" / f"vaani-{size}.png", media_type="image/png")
 
 
+def _voice_limit_token(value: float) -> str:
+    """Render VOICE_MAX_SECONDS for the demo page. Non-numeric values use the default."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = 30.0
+    if not math.isfinite(number) or number <= 0:
+        number = 30.0
+    return f"{number:g}"
+
+
 @app.get("/flows/{page}")
 def ui_flow_page(page: str):
     """Serve one of the flow-reference HTML pages."""
@@ -108,6 +122,10 @@ def ui_flow_page(page: str):
     path = UI_DIR / "flows" / f"{page}.html"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Flow page not found")
+    if page == "voice":
+        html = path.read_text(encoding="utf-8")
+        html = html.replace("__VOICE_MAX_SECONDS__", _voice_limit_token(settings.voice_max_seconds))
+        return HTMLResponse(html)
     return FileResponse(path, media_type="text/html")
 
 
