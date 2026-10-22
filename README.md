@@ -63,6 +63,12 @@ request, no restart needed. Close the file in Excel before using pages
 that write (marking tasks done, adding students, chat history), because
 Windows locks files that are open in Excel. Run a single uvicorn worker.
 
+To export saved parent–teacher question/answer pairs for offline evaluation, from the repo root:
+
+    python scripts/export_parent_teacher_turns.py
+
+`--since YYYY-MM-DD` keeps turns on or after that date (inclusive). `--agent NAME` exports a different agent's replies (default `parent_teacher`). The file is written to `data/exports/parent_teacher_turns.jsonl`. Exports can contain sensitive student information, stay on this machine, and `data/exports/` is gitignored.
+
 ## What's production-shaped vs stubbed
 
 Real: agent graph, tool-calling contracts, tenant isolation pattern,

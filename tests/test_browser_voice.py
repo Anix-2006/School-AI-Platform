@@ -17,16 +17,16 @@ from app.voice.storage import AudioStore
 
 class FakeStt:
     def __init__(self, text="When is Annual Day?", language="en"):
-        self.result = Transcript(text, language, 1.0, 0.2)
+        self.result = Transcript(text, language, duration_seconds=0.2, confidence=1.0)
         self.calls = 0
         self.audio = []
 
     def load(self):
         return None
 
-    def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+    def transcribe(self, audio_wav, language=None, initial_prompt=None):
         self.calls += 1
-        self.audio.append((audio, content_type))
+        self.audio.append((audio_wav, language))
         return self.result
 
 
@@ -36,7 +36,7 @@ class FakeTts:
     def __init__(self):
         self.calls = []
 
-    async def synthesize(self, text, language):
+    def speak(self, text, language):
         self.calls.append((text, language))
         return b"ID3speech"
 
@@ -124,8 +124,8 @@ def test_browser_voice_answers_and_returns_spoken_audio(client, browser_voice, s
     assert base64.b64decode(body["audio_base64"]) == b"ID3speech"
     assert set(body) == {"transcript", "reply", "agent_used", "language", "audio_base64"}
     assert stt.calls == 1
-    audio, content_type = stt.audio[0]
-    assert content_type == "audio/wav"
+    audio, heard_language = stt.audio[0]
+    assert heard_language == guardian["preferred_language"]
     with wave.open(io.BytesIO(audio), "rb") as decoded:
         assert decoded.getnchannels() == 1
         assert decoded.getframerate() == 16000

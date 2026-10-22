@@ -5,9 +5,9 @@ import logging
 
 from app.config import settings
 from app.voice.service import VoiceService
-from app.voice.stt import FasterWhisperEngine
+from app.voice.stt import get_stt
 from app.voice.storage import AudioStore
-from app.voice.tts import GttsEngine
+from app.voice.tts import get_tts
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +27,10 @@ class VoiceRuntime:
                 return
             self.state = "warming"
             try:
-                stt = FasterWhisperEngine(
-                    settings.whisper_model,
-                    device=settings.whisper_device,
-                    compute_type=settings.whisper_compute_type,
-                )
+                stt = get_stt()
+                # Load the Whisper model at app startup, not on the first voice request.
                 await asyncio.to_thread(stt.warmup)
-                tts = GttsEngine(
-                    timeout=settings.voice_tts_timeout,
-                    cache_size=settings.tts_cache_size,
-                )
+                tts = get_tts()
                 self.service = VoiceService(
                     stt,
                     tts,
@@ -47,6 +41,7 @@ class VoiceRuntime:
                     global_rate=settings.voice_global_rate,
                     speak_rate=settings.voice_speak_rate,
                     max_seconds=settings.voice_max_seconds,
+                    tts_timeout=settings.voice_tts_timeout,
                 )
                 self.state = "ready"
                 self.error = None
