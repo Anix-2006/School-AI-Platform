@@ -90,6 +90,9 @@ class VoiceService:
         session_id: str | None,
         upload_ms: int = 0,
         decode_ms: int = 0,
+        channel: str = "voice",
+        thread_id: str | None = None,
+        retain_audio: bool = True,
     ) -> dict:
         self.check_rate("chat", guardian["id"])
         started = time.perf_counter()
@@ -124,8 +127,9 @@ class VoiceService:
                     transcribed,
                     upload_ms,
                     decode_ms,
+                    retain_audio=retain_audio,
                 )
-            thread_id = (
+            resolved_thread = thread_id or (
                 f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
             )
             result = await asyncio.to_thread(
@@ -134,19 +138,14 @@ class VoiceService:
                 guardian,
                 student,
                 transcript.text,
-                "voice",
-                thread_id,
+                channel,
+                resolved_thread,
                 reply_language,
             )
             replied = time.perf_counter()
             spoken_text = clean_for_speech(result["reply"], reply_language)
             speech = await self._speak(spoken_text, reply_language)
             finished = time.perf_counter()
-            audio_id = (
-                self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
-                if speech
-                else None
-            )
             router_ms = int(result.get("router_ms") or 0)
             agent_ms = int(result.get("agent_llm_ms") or max(
                 0, round((replied - transcribed) * 1000) - router_ms
@@ -173,8 +172,7 @@ class VoiceService:
                 "language": reply_language,
                 "transcript": transcript.text,
                 "spoken_text": spoken_text,
-                "audio_id": audio_id,
-                "tts_degraded": not bool(speech),
+                **self._speech_fields(tenant_id, guardian["id"], speech, retain_audio),
                 "timings": {
                     "queue": timings_ms["queue"],
                     "stt": timings_ms["stt"],
@@ -186,6 +184,20 @@ class VoiceService:
             }
         finally:
             self._slots.release()
+
+    def _speech_fields(
+        self, tenant_id: str, guardian_id: str, speech: bytes, retain_audio: bool
+    ) -> dict:
+        """Keep a downloadable copy for the browser. WhatsApp sends the bytes, then drops them."""
+        return {
+            "audio_id": (
+                self.audio_store.put(audio_owner_key(tenant_id, guardian_id), speech)
+                if speech and retain_audio
+                else None
+            ),
+            "tts_degraded": not bool(speech),
+            **({} if retain_audio else {"speech": speech}),
+        }
 
     async def _friendly_retry(
         self,
@@ -199,6 +211,7 @@ class VoiceService:
         transcribed: float,
         upload_ms: int,
         decode_ms: int,
+        retain_audio: bool = True,
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
@@ -223,12 +236,7 @@ class VoiceService:
             "intent_confidence": None,
             "student_id": student_id,
             "language": language,
-            "audio_id": (
-                self.audio_store.put(audio_owner_key(tenant_id, guardian_id), speech)
-                if speech
-                else None
-            ),
-            "tts_degraded": not bool(speech),
+            **self._speech_fields(tenant_id, guardian_id, speech, retain_audio),
             "timings": {
                 "queue": timings_ms["queue"],
                 "stt": timings_ms["stt"],

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import io
+import os
+import shutil
+import subprocess
+import tempfile
 import wave
+from pathlib import Path
 
 
 class AudioValidationError(ValueError):
@@ -9,6 +14,17 @@ class AudioValidationError(ValueError):
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
+
+
+class AudioConversionError(RuntimeError):
+    """ffmpeg could not turn a reply MP3 into an OGG/Opus voice note."""
+
+
+# Mono Opus at a voice bitrate. WhatsApp shows this as a voice note.
+# 16 kHz is the input rate stored in OpusHead. Opus itself decodes at 48 kHz.
+_VOICE_SAMPLE_RATE = 16_000
+_VOICE_BITRATE = "24k"
+_FFMPEG_TIMEOUT_SECONDS = 30.0
 
 
 SUPPORTED_TYPES = {
@@ -82,3 +98,80 @@ def _duration_seconds(audio: bytes, media_type: str) -> float:
         raise
     except Exception:
         raise AudioValidationError(422, "Invalid audio") from None
+
+
+def mp3_to_ogg_opus(mp3: bytes) -> bytes:
+    """Convert gTTS MP3 bytes to mono OGG/Opus at a voice bitrate.
+
+    The Ogg muxer needs a real file, so ffmpeg writes into a temporary
+    directory that is removed before this returns. The caller drops the
+    returned bytes after the WhatsApp send.
+    """
+    if not mp3:
+        raise AudioConversionError("Audio is empty")
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise AudioConversionError("ffmpeg is not installed or not on PATH")
+    with tempfile.TemporaryDirectory(prefix="wa-voice-") as directory:
+        source = Path(directory) / "reply.mp3"
+        target = Path(directory) / "reply.ogg"
+        source.write_bytes(mp3)
+        _run_ffmpeg(_opus_command(ffmpeg, str(source), str(target)))
+        data = target.read_bytes() if target.is_file() else b""
+    if not _is_ogg_opus(data):
+        raise AudioConversionError("ffmpeg output is not an OGG/Opus voice note")
+    return data
+
+
+def _opus_command(ffmpeg: str, source: str, target: str) -> list[str]:
+    return [
+        ffmpeg,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        source,
+        "-map_metadata",
+        "-1",
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        str(_VOICE_SAMPLE_RATE),
+        "-c:a",
+        "libopus",
+        "-b:a",
+        _VOICE_BITRATE,
+        "-application",
+        "voip",
+        "-f",
+        "ogg",
+        target,
+    ]
+
+
+def _is_ogg_opus(data: bytes) -> bool:
+    return data.startswith(b"OggS") and b"OpusHead" in data
+
+
+def _run_ffmpeg(command: list[str]) -> bytes:
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            timeout=_FFMPEG_TIMEOUT_SECONDS,
+            check=False,
+            **kwargs,
+        )
+    except subprocess.TimeoutExpired:
+        raise AudioConversionError("ffmpeg timed out while converting audio") from None
+    except OSError as exc:
+        raise AudioConversionError(f"ffmpeg could not be started: {exc.strerror or exc}") from None
+    if result.returncode != 0:
+        detail = (result.stderr or b"").decode("utf-8", "replace").strip()
+        raise AudioConversionError(detail[:240] or "ffmpeg could not convert MP3 to OGG/Opus")
+    return result.stdout
