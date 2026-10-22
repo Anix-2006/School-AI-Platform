@@ -23,7 +23,7 @@
     <div>
       <p class="eyebrow">Parent channel</p>
       <h1>Voice</h1>
-      <p class="lead">Choose a parent, hold the button, and ask a question. The page shows what was heard and plays the spoken answer. Microphone access works on localhost; any other host needs HTTPS.</p>
+      <p class="lead">Choose a parent, then start a conversation or hold the button for one question. In a conversation the page listens, sends each question when you pause, and plays the answer. Speaking while the answer plays stops it. Microphone access works on localhost; any other host needs HTTPS.</p>
     </div>
   </div>
 
@@ -31,6 +31,8 @@
     <label for="guardian">Parent</label>
     <select id="guardian"><option value="">Loading parents…</option></select>
     <p class="meta" id="childContext"></p>
+    <button type="button" class="primary voice-demo-live" id="live" data-sample-rate="__VOICE_SAMPLE_RATE__" aria-pressed="false" disabled>Start conversation</button>
+    <p class="voice-demo-status" id="liveStatus">Live conversation is off.</p>
     <button type="button" class="primary voice-demo-record" id="record" aria-pressed="false" disabled>Hold to talk</button>
     <p class="voice-demo-timer" id="timer" data-max-seconds="__VOICE_MAX_SECONDS__">0:00 <span class="meta">/ 0:00</span></p>
   </section>
@@ -51,6 +53,8 @@
 
   const HOLD_MS = 280;
   const guardianSelect = document.getElementById("guardian");
+  const liveButton = document.getElementById("live");
+  const liveStatus = document.getElementById("liveStatus");
   const recordButton = document.getElementById("record");
   const timer = document.getElementById("timer");
   const configuredLimit = Number.parseFloat(timer.dataset.maxSeconds);
@@ -80,6 +84,13 @@
   let startedAt = 0;
   // "prompt" still allows a click to ask. "denied" and "unsupported" keep the button off.
   let microphonePermission = "unknown";
+  let liveSocket = null;
+  let liveContext = null;
+  let liveSource = null;
+  let liveNode = null;
+  let liveMute = null;
+  let liveActive = false;
+  let dropReply = false;
 
   function selectedGuardian() {
     return guardians.find((item) => String(item.id) === guardianSelect.value) || null;
@@ -118,11 +129,31 @@
   function resetButton() {
     mode = "idle";
     delivering = false;
-    guardianSelect.disabled = false;
-    recordButton.disabled = !canRecord();
+    if (!liveActive) guardianSelect.disabled = false;
+    recordButton.disabled = liveActive || !canRecord();
     recordButton.textContent = "Hold to talk";
     recordButton.setAttribute("aria-pressed", "false");
     paintTimer(0);
+    syncLiveButton();
+  }
+
+  function syncLiveButton() {
+    if (liveActive) {
+      liveButton.disabled = false;
+      liveButton.textContent = "Stop";
+      liveButton.setAttribute("aria-pressed", "true");
+      recordButton.disabled = true;
+      return;
+    }
+    liveButton.disabled = !(canRecord() && mode === "idle");
+    liveButton.textContent = "Start conversation";
+    liveButton.setAttribute("aria-pressed", "false");
+  }
+
+  function setLiveStatus(state, text) {
+    if (state) liveStatus.dataset.state = state;
+    else delete liveStatus.dataset.state;
+    liveStatus.textContent = text;
   }
 
   function microphoneApis() {
@@ -142,6 +173,7 @@
     if (!guardian) {
       childContext.textContent = "";
       recordButton.disabled = true;
+      syncLiveButton();
       return;
     }
     const section = guardian.section ? `-${guardian.section}` : "";
@@ -149,24 +181,29 @@
     if (!guardian.has_consent) {
       recordButton.disabled = true;
       showError(`${guardian.name} has not given consent yet, so the assistant can't listen.`);
+      syncLiveButton();
       return;
     }
     if (!microphoneApis()) {
       recordButton.disabled = true;
       showError("This browser cannot record audio. Open the page on http://localhost or HTTPS.");
+      syncLiveButton();
       return;
     }
     if (microphonePermission === "denied") {
       recordButton.disabled = true;
       showError("Microphone permission is needed. Allow the microphone for this page and try again.");
+      syncLiveButton();
       return;
     }
     if (microphonePermission !== "granted" && microphonePermission !== "prompt") {
       recordButton.disabled = true;
+      syncLiveButton();
       return;
     }
-    if (mode === "idle") recordButton.disabled = false;
+    if (mode === "idle" && !liveActive) recordButton.disabled = false;
     clearError();
+    syncLiveButton();
   }
 
   function watchMicrophone() {
@@ -287,13 +324,14 @@
   }
 
   async function startRecording() {
-    if (mode !== "idle") return;
+    if (liveActive || mode !== "idle") return;
     if (!canRecord()) {
       syncGuardian();
       return;
     }
     mode = "starting";
     recordButton.disabled = true;
+    liveButton.disabled = true;
     let media;
     try {
       media = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -342,6 +380,208 @@
     tickTimer = window.setInterval(() => paintTimer(performance.now() - startedAt), 200);
     limitTimer = window.setTimeout(stopRecording, MAX_MS);
   }
+
+  function stopPlayback() {
+    player.pause();
+    player.hidden = true;
+    player.removeAttribute("src");
+  }
+
+  function sendPcm(buffer) {
+    if (liveSocket && liveSocket.readyState === WebSocket.OPEN) liveSocket.send(buffer);
+  }
+
+  function floatToPcm(samples) {
+    const pcm = new Int16Array(samples.length);
+    for (let index = 0; index < samples.length; index += 1) {
+      const sample = Math.max(-1, Math.min(1, samples[index]));
+      pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+    }
+    return pcm.buffer;
+  }
+
+  async function attachMicrophone(media) {
+    const preferred = Number.parseInt(liveButton.dataset.sampleRate, 10);
+    const context = new AudioContext(
+      Number.isFinite(preferred) && preferred > 0 ? { sampleRate: preferred } : undefined
+    );
+    await context.resume();
+    const source = context.createMediaStreamSource(media);
+    const mute = context.createGain();
+    mute.gain.value = 0;
+    let node;
+    if (context.audioWorklet && window.AudioWorkletNode) {
+      await context.audioWorklet.addModule("/voice-live-worklet.js");
+      node = new AudioWorkletNode(context, "pcm-sender");
+      node.port.onmessage = (event) => sendPcm(event.data);
+    } else {
+      node = context.createScriptProcessor(4096, 1, 1);
+      node.onaudioprocess = (event) => sendPcm(floatToPcm(event.inputBuffer.getChannelData(0)));
+    }
+    source.connect(node);
+    node.connect(mute);
+    mute.connect(context.destination);
+    liveContext = context;
+    liveSource = source;
+    liveNode = node;
+    liveMute = mute;
+    return context.sampleRate;
+  }
+
+  function handleLiveMessage(data) {
+    if (!data || typeof data !== "object") return;
+    if (data.type === "status") {
+      const labels = { listening: "Listening", thinking: "Thinking", speaking: "Speaking" };
+      if (data.state === "thinking") dropReply = false;
+      setLiveStatus(data.state, labels[data.state] || data.state);
+      return;
+    }
+    if (data.type === "barge_in") {
+      dropReply = true;
+      stopPlayback();
+      setLiveStatus("listening", "Listening");
+      return;
+    }
+    if (data.type === "reply") {
+      if (dropReply) return;
+      heard.textContent = data.transcript || "—";
+      reply.textContent = data.reply || "";
+      clearError();
+      if (data.audio_base64) {
+        player.hidden = false;
+        player.src = `data:audio/mpeg;base64,${data.audio_base64}`;
+        player.play().catch(() => {});
+      } else {
+        player.hidden = true;
+        player.removeAttribute("src");
+      }
+      return;
+    }
+    if (data.type === "error") {
+      showError(messageFor(data.status, data));
+      stopLive();
+    }
+  }
+
+  function stopLive() {
+    const socket = liveSocket;
+    liveActive = false;
+    dropReply = false;
+    liveSocket = null;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      try { socket.send(JSON.stringify({ type: "stop" })); } catch { /* closing */ }
+      socket.close();
+    }
+    liveSource?.disconnect();
+    liveNode?.disconnect();
+    liveMute?.disconnect();
+    liveSource = null;
+    liveNode = null;
+    liveMute = null;
+    const context = liveContext;
+    liveContext = null;
+    if (context) context.close().catch(() => {});
+    stopTracks();
+    stopPlayback();
+    setLiveStatus("", "Live conversation is off.");
+    guardianSelect.disabled = false;
+    resetButton();
+  }
+
+  async function startLive() {
+    if (liveActive || mode !== "idle" || !canRecord()) {
+      syncGuardian();
+      return;
+    }
+    liveActive = true;
+    recordButton.disabled = true;
+    guardianSelect.disabled = true;
+    liveButton.disabled = false;
+    liveButton.textContent = "Stop";
+    liveButton.setAttribute("aria-pressed", "true");
+    setLiveStatus("", "Starting the conversation…");
+    clearError();
+    let media;
+    try {
+      await window.SchoolAPI.ensureAuth();
+      media = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
+    } catch (error) {
+      liveActive = false;
+      const denied = error && (error.name === "NotAllowedError" || error.name === "SecurityError" || error.name === "PermissionDeniedError");
+      if (denied) microphonePermission = "denied";
+      guardianSelect.disabled = false;
+      setLiveStatus("", "Live conversation is off.");
+      syncGuardian();
+      if (!denied) showError("The microphone could not be started. Check that it is connected and try again.");
+      return;
+    }
+    if (!liveActive) {
+      media.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    stream = media;
+    let captureRate;
+    try {
+      captureRate = await attachMicrophone(media);
+    } catch {
+      stopLive();
+      showError("This browser cannot stream microphone audio. Open the page on http://localhost or HTTPS.");
+      return;
+    }
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const token = encodeURIComponent(window.SchoolAPI.state.token || "");
+    const socket = new WebSocket(`${protocol}//${window.location.host}/voice/live?access_token=${token}`);
+    liveSocket = socket;
+    socket.binaryType = "arraybuffer";
+    socket.addEventListener("open", () => {
+      if (liveSocket !== socket) return;
+      const guardian = selectedGuardian();
+      if (!guardian) {
+        stopLive();
+        return;
+      }
+      socket.send(JSON.stringify({
+        type: "start",
+        guardian_id: guardian.id,
+        session_id: sessionId,
+        sample_rate: captureRate,
+      }));
+    });
+    socket.addEventListener("message", (event) => {
+      if (typeof event.data !== "string") return;
+      try {
+        handleLiveMessage(JSON.parse(event.data));
+      } catch {
+        showError("The conversation sent a message the page could not read.");
+      }
+    });
+    socket.addEventListener("error", () => {
+      if (liveSocket === socket) showError("The conversation connection failed.");
+    });
+    socket.addEventListener("close", () => {
+      if (liveSocket === socket) stopLive();
+    });
+    liveButton.disabled = false;
+    liveButton.textContent = "Stop";
+    liveButton.setAttribute("aria-pressed", "true");
+  }
+
+  player.addEventListener("ended", () => {
+    if (dropReply || !liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+    liveSocket.send(JSON.stringify({ type: "playback_done" }));
+  });
+
+  liveButton.addEventListener("click", () => {
+    if (liveActive) stopLive();
+    else startLive();
+  });
 
   recordButton.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || mode === "sending" || mode === "starting") return;

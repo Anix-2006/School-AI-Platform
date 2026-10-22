@@ -5001,12 +5001,17 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
 
 .voice-demo-page { max-width: 760px; }
 .voice-demo-panel { display: grid; gap: 12px; }
+.voice-demo-live,
 .voice-demo-record {
   justify-self: start;
   min-width: 220px;
   padding: 16px 22px;
   font-size: 18px;
 }
+.voice-demo-status { margin: 0; font-weight: 650; }
+.voice-demo-status[data-state="listening"] { color: var(--accent); }
+.voice-demo-status[data-state="thinking"] { color: var(--warning, #9a6700); }
+.voice-demo-status[data-state="speaking"] { color: var(--danger); }
 .voice-demo-record[aria-pressed="true"] {
   color: #fff;
   background: var(--danger);

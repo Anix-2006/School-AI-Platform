@@ -69,6 +69,7 @@ app.include_router(routes_webhooks.router)
 app.include_router(routes_ops.router)
 app.include_router(routes_teachers.router)
 app.include_router(routes_voice.router)
+app.include_router(routes_voice.live_router)
 
 
 @app.get("/")
@@ -95,6 +96,11 @@ def ui_api_js():
 @app.get("/nav.js")
 def ui_nav_js():
     return FileResponse(UI_DIR / "nav.js", media_type="application/javascript")
+
+
+@app.get("/voice-live-worklet.js")
+def voice_live_worklet():
+    return FileResponse(UI_DIR / "voice-live-worklet.js", media_type="application/javascript")
 
 
 @app.get("/voice-mascot-{size}.png")
@@ -126,6 +132,7 @@ def ui_flow_page(page: str):
     if page == "voice":
         html = path.read_text(encoding="utf-8")
         html = html.replace("__VOICE_MAX_SECONDS__", _voice_limit_token(settings.voice_max_seconds))
+        html = html.replace("__VOICE_SAMPLE_RATE__", str(int(settings.voice_vad_sample_rate)))
         return HTMLResponse(html)
     return FileResponse(path, media_type="text/html")
 

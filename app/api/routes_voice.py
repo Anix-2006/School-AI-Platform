@@ -4,7 +4,7 @@ import base64
 import time
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from python_multipart import MultipartParser
@@ -15,6 +15,7 @@ from app.core.security import decode_token
 from app.core.tenancy import get_current_tenant
 from app.services.chat_service import ChatAccessError, resolve_parent
 from app.voice.audio import AudioValidationError, convert_upload_to_wav, validate_audio
+from app.voice.live import serve_live
 from app.voice.service import VoiceError, audio_owner_key
 
 Language = Literal["en", "hi"]
@@ -371,3 +372,12 @@ async def _read_voice_multipart(
     if audio_bytes is None:
         raise HTTPException(422, "audio is required")
     return fields, audio_bytes, audio_type
+
+
+live_router = APIRouter(prefix="/voice", tags=["voice"])
+
+
+@live_router.websocket("/live")
+async def voice_live(websocket: WebSocket):
+    """Continuous conversation. Auth, guardian, and consent are checked once."""
+    await serve_live(websocket)

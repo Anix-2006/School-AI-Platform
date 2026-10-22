@@ -54,6 +54,19 @@ when it is English, Hindi, or Telugu. Any other language is spoken in English,
 and the response reports English. Microphone access works on `http://localhost`.
 Any other host needs HTTPS.
 
+**Start conversation** on that page opens a live session at `/voice/live`.
+Authentication, the guardian, and consent are checked once when the session
+starts. The microphone stays open. WebRTC VAD (the `webrtcvad` module from
+`webrtcvad-wheels`) splits the audio: a check with spoken English, Hindi, and
+Telugu questions plus background noise produced three utterances at every
+aggressiveness setting, so this lighter detector is used instead of Silero.
+An utterance ends after `VOICE_VAD_SILENCE_MS` (800 ms unless changed) and
+cannot run longer than `VOICE_MAX_SECONDS`. `VOICE_VAD_SENSITIVITY` is 0–3
+(0 keeps quiet speech, 3 rejects more noise; default 2). Each utterance uses
+the same voice flow as a single recording, on one session so the conversation
+keeps its memory. Speaking while a reply is playing stops playback and cancels
+that reply.
+
 ## Demo data
 
 Every read and write goes through `get_store()` in
