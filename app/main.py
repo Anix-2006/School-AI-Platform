@@ -1,13 +1,15 @@
 from pathlib import Path
 import asyncio
+import math
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 import logging
 
 from app.api import routes_chat, routes_students, routes_webhooks, routes_ops, routes_teachers, routes_voice
+from app.config import settings
 from app.core.security import create_access_token
 from app.services.excel_store import get_store
 from app.voice.runtime import VoiceRuntime
@@ -19,6 +21,7 @@ FLOW_PAGES = {
     "platform-overview",
     "parent-chat",
     "voice-assistant",
+    "voice",
     "ask-a-helper",
     "whatsapp",
     "daily-updates",
@@ -66,6 +69,7 @@ app.include_router(routes_webhooks.router)
 app.include_router(routes_ops.router)
 app.include_router(routes_teachers.router)
 app.include_router(routes_voice.router)
+app.include_router(routes_voice.live_router)
 
 
 @app.get("/")
@@ -94,11 +98,27 @@ def ui_nav_js():
     return FileResponse(UI_DIR / "nav.js", media_type="application/javascript")
 
 
+@app.get("/voice-live-worklet.js")
+def voice_live_worklet():
+    return FileResponse(UI_DIR / "voice-live-worklet.js", media_type="application/javascript")
+
+
 @app.get("/voice-mascot-{size}.png")
 def voice_mascot(size: int):
     if size not in {32, 512}:
         raise HTTPException(status_code=404, detail="Mascot size not found")
     return FileResponse(UI_DIR / "assets" / f"vaani-{size}.png", media_type="image/png")
+
+
+def _voice_limit_token(value: float) -> str:
+    """Render VOICE_MAX_SECONDS for the demo page. Non-numeric values use the default."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = 30.0
+    if not math.isfinite(number) or number <= 0:
+        number = 30.0
+    return f"{number:g}"
 
 
 @app.get("/flows/{page}")
@@ -109,6 +129,11 @@ def ui_flow_page(page: str):
     path = UI_DIR / "flows" / f"{page}.html"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Flow page not found")
+    if page == "voice":
+        html = path.read_text(encoding="utf-8")
+        html = html.replace("__VOICE_MAX_SECONDS__", _voice_limit_token(settings.voice_max_seconds))
+        html = html.replace("__VOICE_SAMPLE_RATE__", str(int(settings.voice_vad_sample_rate)))
+        return HTMLResponse(html)
     return FileResponse(path, media_type="text/html")
 
 

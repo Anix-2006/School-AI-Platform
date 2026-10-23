@@ -34,13 +34,30 @@ class Settings(BaseSettings):
     voice_max_seconds: float = 30
     voice_max_bytes: int = 5_242_880
     tts_cache_size: int = 128
+    # How many gTTS requests may run at once while a reply is spoken sentence by sentence.
+    tts_max_parallel: int = 3
+    # Pieces shorter than this are merged into the next sentence ("Ok." stays with what follows).
+    tts_min_sentence_chars: int = 12
     voice_queue_timeout: float = 2.0
     voice_guardian_rate: int = 10
     voice_global_rate: int = 60
     voice_speak_rate: int = 20
-    voice_tts_timeout: float = 4.0
+    # Each gTTS attempt. One retry waits briefly, then the reply is text only.
+    tts_timeout_seconds: float = 5.0
+    tts_retries: int = 1
+    tts_retry_delay_seconds: float = 0.2
+    # After this many failed attempts in a row, skip speech instead of waiting again.
+    tts_cooldown_failures: int = 3
+    tts_cooldown_seconds: float = 30.0
     voice_audio_ttl: float = 300.0
+    # Live conversation. Silence closes an utterance, VOICE_MAX_SECONDS caps it,
+    # and sensitivity is the WebRTC VAD mode: 0 keeps quiet speech, 3 rejects more noise.
     voice_vad_silence_ms: int = 800
+    voice_vad_sensitivity: int = 2
+    voice_vad_frame_ms: int = 30
+    voice_vad_preroll_ms: int = 300
+    voice_vad_min_speech_ms: int = 300
+    voice_vad_sample_rate: int = 16000
     voice_idle_prompt_seconds: int = 20
 
 

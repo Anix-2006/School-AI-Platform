@@ -4998,3 +4998,26 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   .management-hero,
   .records-hero { padding: 20px; border-radius: 20px; }
 }
+
+.voice-demo-page { max-width: 760px; }
+.voice-demo-panel { display: grid; gap: 12px; }
+.voice-demo-live,
+.voice-demo-record {
+  justify-self: start;
+  min-width: 220px;
+  padding: 16px 22px;
+  font-size: 18px;
+}
+.voice-demo-status { margin: 0; font-weight: 650; }
+.voice-demo-status[data-state="listening"] { color: var(--accent); }
+.voice-demo-status[data-state="thinking"] { color: var(--warning, #9a6700); }
+.voice-demo-status[data-state="speaking"] { color: var(--danger); }
+.voice-demo-record[aria-pressed="true"] {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.voice-demo-timer { margin: 0; font-variant-numeric: tabular-nums; }
+.voice-demo-heard { margin: 0; font-size: 18px; }
+.voice-demo-reply { margin: 8px 0 0; white-space: pre-wrap; }
+.voice-demo-player { width: min(100%, 420px); margin-top: 12px; }

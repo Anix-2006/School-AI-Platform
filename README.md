@@ -46,6 +46,52 @@ For the Python 3.11 setup, voice configuration, secure-browser requirements,
 manual checks, Render deployment, limits, and unmeasured verification
 templates, see [RUNNING.md](RUNNING.md). Run one uvicorn worker.
 
+The browser voice demo is at http://localhost:8000/flows/voice (set
+`VOICE_ENABLED=true`). Choose a parent, record a question, and the page plays
+the spoken reply. Recording stops just before `VOICE_MAX_SECONDS` (30 seconds
+unless that setting is changed). The spoken reply uses the parent's language
+when it is English, Hindi, or Telugu. Any other language is spoken in English,
+and the response reports English. Microphone access works on `http://localhost`.
+Any other host needs HTTPS.
+
+**Start conversation** on that page opens a live session at `/voice/live`.
+Authentication, the guardian, and consent are checked once when the session
+starts. The microphone stays open. WebRTC VAD (the `webrtcvad` module from
+`webrtcvad-wheels`) splits the audio: a check with spoken English, Hindi, and
+Telugu questions plus background noise produced three utterances at every
+aggressiveness setting, so this lighter detector is used instead of Silero.
+An utterance ends after `VOICE_VAD_SILENCE_MS` (800 ms unless changed) and
+cannot run longer than `VOICE_MAX_SECONDS`. `VOICE_VAD_SENSITIVITY` is 0–3
+(0 keeps quiet speech, 3 rejects more noise; default 2). Each utterance uses
+the same voice flow as a single recording, on one session so the conversation
+keeps its memory. Speaking while a reply is playing stops playback and cancels
+that reply. Long replies are spoken sentence by sentence. Up to
+`TTS_MAX_PARALLEL` sentences (default 3) are generated at once, each sentence
+is cached on its own, and live playback starts with the first sentence as
+soon as it is ready. A voice note still receives one MP3, joined in the
+original order. Each gTTS network call stops after `TTS_TIMEOUT_SECONDS`
+(5 seconds unless changed) and that reply is tried once more after a brief
+pause (`TTS_RETRIES` is 1, `TTS_RETRY_DELAY_SECONDS` is 0.2). If speech still
+fails, the parent gets the text reply and no audio. After
+`TTS_COOLDOWN_FAILURES` failed attempts in a row (default 3), speech is skipped
+for `TTS_COOLDOWN_SECONDS` (default 30) instead of waiting on the timeout again.
+A hung call is abandoned rather than followed. If too many calls are already
+hung, the next one is skipped instead of starting another speech thread.
+To time that speech stage from the repo root (real gTTS, so
+the machine needs network access):
+
+    py -3.11 scripts/benchmark_tts_sentences.py
+
+The script adds the repository root to its own import path.
+
+Uploads are converted to 16 kHz WAV, speech MP3s can be turned into OGG/Opus,
+and sentence clips are joined without writing those sounds to disk. ffmpeg
+reads the bytes on stdin and writes the result to stdout, and each conversion
+stops after 30 seconds if it hangs. The only audio kept after a turn is the
+in-memory speech cache. To time the upload conversion from the repo root:
+
+    py -3.11 scripts/benchmark_ffmpeg_convert.py
+
 ## Demo data
 
 Every read and write goes through `get_store()` in
