@@ -84,6 +84,14 @@ the machine needs network access):
 
 The script adds the repository root to its own import path.
 
+Uploads are converted to 16 kHz WAV, speech MP3s can be turned into OGG/Opus,
+and sentence clips are joined without writing those sounds to disk. ffmpeg
+reads the bytes on stdin and writes the result to stdout, and each conversion
+stops after 30 seconds if it hangs. The only audio kept after a turn is the
+in-memory speech cache. To time the upload conversion from the repo root:
+
+    py -3.11 scripts/benchmark_ffmpeg_convert.py
+
 ## Demo data
 
 Every read and write goes through `get_store()` in

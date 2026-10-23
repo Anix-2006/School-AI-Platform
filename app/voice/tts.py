@@ -2,18 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import io
-import os
 import re
-import shutil
-import subprocess
-import tempfile
 import threading
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Callable, Protocol
 
 from app.config import settings
+from app.voice.audio import FfmpegError, run_ffmpeg_pipe
 
 # Our language codes -> gTTS lang codes.
 _GTTS_LANG = {
@@ -203,65 +199,36 @@ def split_sentences(text: str, language: str = "en") -> list[str]:
 
 
 def concat_mp3(parts: list[bytes]) -> bytes:
-    """Join MP3 clips with ffmpeg so the result plays as one file, in order."""
+    """Join MP3 clips in memory so the result plays as one file, in order."""
     usable = [part for part in parts if part]
     if not usable:
         return b""
     if len(usable) == 1:
         return usable[0]
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg is None:
-        raise RuntimeError("ffmpeg is required to join speech")
-    with tempfile.TemporaryDirectory(prefix="tts-join-") as directory:
-        root = Path(directory)
-        lines: list[str] = []
-        for index, part in enumerate(usable):
-            path = root / f"part{index}.mp3"
-            path.write_bytes(part)
-            lines.append(f"file '{path.as_posix()}'")
-        list_path = root / "list.txt"
-        list_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        target = root / "joined.mp3"
-        command = [
-            ffmpeg,
-            "-nostdin",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(list_path),
-            "-c",
-            "copy",
-            str(target),
-        ]
-        if not _run_ffmpeg(command) or not target.is_file() or target.stat().st_size == 0:
-            command = [
-                ffmpeg,
-                "-nostdin",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(list_path),
-                "-c:a",
-                "libmp3lame",
-                "-q:a",
-                "4",
-                str(target),
-            ]
-            if not _run_ffmpeg(command) or not target.is_file():
-                raise RuntimeError("Could not join speech audio")
-        return target.read_bytes()
+    try:
+        pcm = b"".join(_mp3_to_pcm(part) for part in usable)
+        joined = run_ffmpeg_pipe(
+            pcm,
+            input_args=["-f", "s16le", "-ar", "24000", "-ac", "1"],
+            output_args=["-c:a", "libmp3lame", "-q:a", "4", "-f", "mp3"],
+        )
+    except FfmpegError as exc:
+        if exc.reason == "missing":
+            raise RuntimeError("ffmpeg is required to join speech") from None
+        raise RuntimeError("Could not join speech audio") from None
+    if not joined:
+        raise RuntimeError("Could not join speech audio")
+    return joined
+
+
+def _mp3_to_pcm(mp3: bytes) -> bytes:
+    pcm = run_ffmpeg_pipe(
+        mp3,
+        output_args=["-vn", "-ac", "1", "-ar", "24000", "-f", "s16le"],
+    )
+    if not pcm:
+        raise FfmpegError("failed")
+    return pcm
 
 
 def _parallel_workers() -> int:
@@ -304,23 +271,6 @@ def _gtts_pieces(sentence: str) -> list[str]:
     if remaining:
         pieces.append(remaining)
     return pieces or [sentence]
-
-
-def _run_ffmpeg(command: list[str]) -> bool:
-    kwargs = {}
-    if os.name == "nt":
-        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            timeout=30,
-            check=False,
-            **kwargs,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0
 
 
 _tts: GTTSSpeaker | None = None
