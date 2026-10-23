@@ -42,7 +42,13 @@ class Settings(BaseSettings):
     voice_guardian_rate: int = 10
     voice_global_rate: int = 60
     voice_speak_rate: int = 20
-    voice_tts_timeout: float = 4.0
+    # Each gTTS attempt. One retry waits briefly, then the reply is text only.
+    tts_timeout_seconds: float = 5.0
+    tts_retries: int = 1
+    tts_retry_delay_seconds: float = 0.2
+    # After this many failed attempts in a row, skip speech instead of waiting again.
+    tts_cooldown_failures: int = 3
+    tts_cooldown_seconds: float = 30.0
     voice_audio_ttl: float = 300.0
     # Live conversation. Silence closes an utterance, VOICE_MAX_SECONDS caps it,
     # and sensitivity is the WebRTC VAD mode: 0 keeps quiet speech, 3 rejects more noise.

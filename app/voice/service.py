@@ -14,6 +14,14 @@ from app.voice.speech_text import clean_for_speech
 from app.voice.stt import SpeechToText, Transcript
 from app.voice.storage import AudioStore
 from app.voice.tts import TextToSpeech
+from app.voice.tts_policy import (
+    TtsCircuit,
+    non_negative_float,
+    positive_int,
+    post_if_active,
+    run_blocking,
+    timeout_seconds,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +64,10 @@ class VoiceService:
         speak_rate: int = 20,
         max_seconds: float = 30.0,
         tts_timeout: float | None = None,
+        tts_retries: int | None = None,
+        tts_retry_delay: float | None = None,
+        tts_cooldown: float | None = None,
+        tts_cooldown_failures: int | None = None,
     ):
         self.stt = stt
         self.tts = tts
@@ -65,8 +77,30 @@ class VoiceService:
         self.global_rate = global_rate
         self.speak_rate = speak_rate
         self.max_seconds = max_seconds
-        self.tts_timeout = (
-            settings.voice_tts_timeout if tts_timeout is None else tts_timeout
+        self.tts_timeout = timeout_seconds(
+            settings.tts_timeout_seconds if tts_timeout is None else tts_timeout
+        )
+        self.tts_retries = positive_int(
+            settings.tts_retries if tts_retries is None else tts_retries, 1
+        )
+        self.tts_retry_delay = non_negative_float(
+            settings.tts_retry_delay_seconds if tts_retry_delay is None else tts_retry_delay,
+            0.2,
+        )
+        self._tts_circuit = TtsCircuit(
+            failures_before_open=max(
+                1,
+                positive_int(
+                    settings.tts_cooldown_failures
+                    if tts_cooldown_failures is None
+                    else tts_cooldown_failures,
+                    3,
+                ),
+            ),
+            cooldown_seconds=non_negative_float(
+                settings.tts_cooldown_seconds if tts_cooldown is None else tts_cooldown,
+                30.0,
+            ),
         )
         self._slots = asyncio.Semaphore(max(1, max_concurrency))
         self._rates = SlidingRateLimiter()
@@ -153,7 +187,9 @@ class VoiceService:
             )
             replied = time.perf_counter()
             spoken_text = clean_for_speech(result["reply"], reply_language)
-            speech = await self._speak(spoken_text, reply_language, on_sentence=on_sentence)
+            speech, tts_failed = await self._speak(
+                spoken_text, reply_language, on_sentence=on_sentence
+            )
             finished = time.perf_counter()
             audio_id = (
                 self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
@@ -174,12 +210,8 @@ class VoiceService:
                 "tts": round((finished - replied) * 1000),
             }
             timings_ms["total"] = sum(timings_ms.values())
-            logger.info(
-                "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
-                guardian["id"],
-                session_id or "default",
-                reply_language,
-                timings_ms,
+            _log_voice_turn(
+                guardian["id"], session_id, reply_language, timings_ms, tts_failed
             )
             return {
                 **result,
@@ -188,6 +220,7 @@ class VoiceService:
                 "spoken_text": spoken_text,
                 "audio_id": audio_id,
                 "tts_degraded": not bool(speech),
+                "error_stage": "tts" if tts_failed else None,
                 "timings": {
                     "queue": timings_ms["queue"],
                     "stt": timings_ms["stt"],
@@ -216,7 +249,7 @@ class VoiceService:
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
-        speech = await self._speak(reply, language, on_sentence=on_sentence)
+        speech, tts_failed = await self._speak(reply, language, on_sentence=on_sentence)
         finished = time.perf_counter()
         timings_ms = {
             "upload": upload_ms,
@@ -228,6 +261,7 @@ class VoiceService:
             "tts": round((finished - tts_started) * 1000),
         }
         timings_ms["total"] = sum(timings_ms.values())
+        _log_voice_turn(guardian_id, None, language, timings_ms, tts_failed)
         return {
             "reply": reply,
             "transcript": transcript.text,
@@ -243,6 +277,7 @@ class VoiceService:
                 else None
             ),
             "tts_degraded": not bool(speech),
+            "error_stage": "tts" if tts_failed else None,
             "timings": {
                 "queue": timings_ms["queue"],
                 "stt": timings_ms["stt"],
@@ -259,12 +294,12 @@ class VoiceService:
         if not cleaned:
             raise VoiceError(422, "Text has no speakable content")
         try:
-            speech = await self._speak(cleaned, language, degrade=False)
+            speech, failed = await self._speak(cleaned, language, degrade=False)
         except ValueError as exc:
             raise VoiceError(422, str(exc)) from None
         except Exception:
             raise VoiceError(503, "Text-to-speech is temporarily unavailable") from None
-        if not speech:
+        if failed or not speech:
             raise VoiceError(503, "Text-to-speech is temporarily unavailable")
         return speech
 
@@ -281,39 +316,79 @@ class VoiceService:
 
     async def _speak(
         self, text: str, language: str, *, degrade: bool = True, on_sentence=None
-    ) -> bytes:
-        try:
-            if on_sentence is not None and hasattr(self.tts, "speak_streaming"):
-                speak_call = self._stream_speech(text, language, on_sentence)
-            else:
-                speak_call = asyncio.to_thread(self.tts.speak, text, language)
-            return await asyncio.wait_for(speak_call, timeout=self.tts_timeout)
-        except ValueError:
-            raise
-        except Exception:
-            # A live stream must not look successful after a sentence failed.
-            if on_sentence is not None or not degrade:
+    ) -> tuple[bytes, bool]:
+        """Return ``(audio, failed)``. A failure is no audio, not a lost reply.
+
+        Each attempt stops at ``tts_timeout``. One retry follows a brief wait.
+        After enough failures, the cool-down skips the engine entirely.
+        """
+        if self._tts_circuit.cooling_down():
+            if not degrade:
+                raise RuntimeError("Speech generation is in cool-down")
+            return b"", True
+        attempts = self.tts_retries + 1
+        emitted = False
+
+        async def watch(index: int, sentence: str, audio: bytes) -> None:
+            nonlocal emitted
+            emitted = True
+            await on_sentence(index, sentence, audio)
+
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            if self._tts_circuit.cooling_down():
+                if not degrade:
+                    raise RuntimeError("Speech generation is in cool-down")
+                return b"", True
+            try:
+                if on_sentence is not None and hasattr(self.tts, "speak_streaming"):
+                    audio = await asyncio.wait_for(
+                        self._stream_speech(text, language, watch),
+                        timeout=self.tts_timeout,
+                    )
+                else:
+                    audio = await run_blocking(
+                        lambda: self.tts.speak(text, language),
+                        self.tts_timeout,
+                    )
+            except ValueError:
                 raise
-            return b""
+            except Exception as exc:
+                last_error = exc
+                self._tts_circuit.record_failure()
+                # A sentence already sent to the browser must not be generated again.
+                if emitted or attempt + 1 >= attempts:
+                    break
+                if self.tts_retry_delay:
+                    await asyncio.sleep(self.tts_retry_delay)
+                continue
+            self._tts_circuit.record_success()
+            return audio or b"", False
+        if not degrade:
+            raise last_error or RuntimeError("Speech generation failed")
+        return b"", True
 
     async def _stream_speech(self, text: str, language: str, on_sentence) -> bytes:
         """Run sentence synthesis off the event loop and emit each sentence in order."""
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
+        active = threading.Event()
+        active.set()
 
         def emit(index: int, sentence: str, audio: bytes) -> None:
-            loop.call_soon_threadsafe(queue.put_nowait, ("sentence", index, sentence, audio))
+            post_if_active(loop, queue, ("sentence", index, sentence, audio), active)
 
         def work() -> None:
             try:
                 audio = self.tts.speak_streaming(
                     text, language, on_sentence=emit, join=False
                 )
-                loop.call_soon_threadsafe(queue.put_nowait, ("done", audio))
+                outcome = ("done", audio)
             except Exception as exc:
-                loop.call_soon_threadsafe(queue.put_nowait, ("error", exc))
+                outcome = ("error", exc)
+            post_if_active(loop, queue, outcome, active)
 
-        worker = asyncio.create_task(asyncio.to_thread(work))
+        threading.Thread(target=work, name="tts-stream", daemon=True).start()
         try:
             while True:
                 item = await queue.get()
@@ -326,7 +401,7 @@ class VoiceService:
                 else:
                     raise item[1]
         finally:
-            await worker
+            active.clear()
 
     def close(self) -> None:
         close = getattr(self.tts, "close", None)
@@ -383,6 +458,31 @@ def choose_reply_language(transcript: Transcript) -> str:
     if transcript.language == "hi" or (letters and devanagari / letters >= 0.15):
         return "hi"
     return "en"
+
+
+def _log_voice_turn(
+    guardian_id: str,
+    session_id: str | None,
+    language: str,
+    timings_ms: dict,
+    tts_failed: bool,
+) -> None:
+    if tts_failed:
+        logger.info(
+            "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s error_stage=tts",
+            guardian_id,
+            session_id or "default",
+            language,
+            timings_ms,
+        )
+        return
+    logger.info(
+        "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
+        guardian_id,
+        session_id or "default",
+        language,
+        timings_ms,
+    )
 
 
 def audio_owner_key(tenant_id: str, guardian_id: str) -> str:

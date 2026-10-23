@@ -145,14 +145,28 @@ class GTTSSpeaker:
 
     @staticmethod
     def _render(text: str, gtts_lang: str) -> bytes:
-        from gtts import gTTS
+        """One gTTS network call, cut off at TTS_TIMEOUT_SECONDS.
 
-        target = io.BytesIO()
-        kwargs: dict = {"text": text, "lang": gtts_lang}
-        if gtts_lang == "en":
-            kwargs["tld"] = "co.in"
-        gTTS(**kwargs).write_to_fp(target)
-        return target.getvalue()
+        The network thread is abandoned when the limit is reached. Failed and
+        empty audio is not cached; the caller sees the timeout instead.
+        """
+        from app.voice.tts_policy import run_blocking_sync, timeout_seconds
+
+        def synthesize() -> bytes:
+            from gtts import gTTS
+
+            target = io.BytesIO()
+            kwargs: dict = {"text": text, "lang": gtts_lang}
+            if gtts_lang == "en":
+                kwargs["tld"] = "co.in"
+            gTTS(**kwargs).write_to_fp(target)
+            return target.getvalue()
+
+        return run_blocking_sync(
+            synthesize,
+            timeout_seconds(settings.tts_timeout_seconds),
+            limited=True,
+        )
 
 
 def split_sentences(text: str, language: str = "en") -> list[str]:

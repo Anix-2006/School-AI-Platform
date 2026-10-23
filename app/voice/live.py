@@ -181,10 +181,13 @@ class LiveConversation:
             if audio_id
             else None
         )
+        text_only = not streamed and not speech
         async with self._state:
             if generation != self.generation:
                 return
-            if not streamed:
+            if text_only:
+                self.phase = "listening"
+            elif not streamed:
                 self.phase = "speaking"
         payload = {
             "type": "reply",
@@ -195,6 +198,9 @@ class LiveConversation:
             "audio_base64": None if streamed else _b64(speech),
         }
         await self._send(payload)
+        if text_only:
+            await self._send({"type": "status", "state": "listening"})
+            return
         async with self._state:
             if generation != self.generation or self.phase != "speaking":
                 return
