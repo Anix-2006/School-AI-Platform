@@ -41,7 +41,11 @@ class VoiceRuntime:
                     global_rate=settings.voice_global_rate,
                     speak_rate=settings.voice_speak_rate,
                     max_seconds=settings.voice_max_seconds,
-                    tts_timeout=settings.voice_tts_timeout,
+                    tts_timeout=settings.tts_timeout_seconds,
+                    tts_retries=settings.tts_retries,
+                    tts_retry_delay=settings.tts_retry_delay_seconds,
+                    tts_cooldown=settings.tts_cooldown_seconds,
+                    tts_cooldown_failures=settings.tts_cooldown_failures,
                 )
                 self.state = "ready"
                 self.error = None

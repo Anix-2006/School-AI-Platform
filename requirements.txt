@@ -16,4 +16,5 @@ numpy==2.4.6
 faster-whisper==1.1.1
 av==13.1.0
 gTTS==2.5.4
+webrtcvad-wheels==2.0.14.post1
 python-multipart==0.0.20
