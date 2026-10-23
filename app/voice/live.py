@@ -126,6 +126,30 @@ class LiveConversation:
         await self._send({"type": "status", "state": "thinking"})
 
     async def _run_turn(self, generation: int, pcm: bytes) -> None:
+        streamed = False
+
+        async def on_sentence(index: int, sentence: str, audio: bytes) -> None:
+            nonlocal streamed
+            async with self._state:
+                if generation != self.generation:
+                    return
+                first = index == 0 and not streamed
+                streamed = True
+                if first:
+                    self.phase = "speaking"
+            if generation != self.generation:
+                return
+            if first:
+                await self._send({"type": "status", "state": "speaking"})
+            await self._send(
+                {
+                    "type": "sentence",
+                    "index": index,
+                    "text": sentence,
+                    "audio_base64": _b64(audio),
+                }
+            )
+
         try:
             result = await self.service.chat(
                 tenant_id=self.tenant_id,
@@ -136,6 +160,7 @@ class LiveConversation:
                 language=None,
                 session_id=self.session_id,
                 lock_language=True,
+                on_sentence=on_sentence,
             )
         except asyncio.CancelledError:
             return
@@ -148,7 +173,7 @@ class LiveConversation:
                 generation, 503, "The assistant could not answer. Please try again."
             )
             return
-        audio_id = result.get("audio_id")
+        audio_id = None if streamed else result.get("audio_id")
         speech = (
             self.service.audio_store.take(
                 audio_id, audio_owner_key(self.tenant_id, self.guardian["id"])
@@ -159,14 +184,15 @@ class LiveConversation:
         async with self._state:
             if generation != self.generation:
                 return
-            self.phase = "speaking"
+            if not streamed:
+                self.phase = "speaking"
         payload = {
             "type": "reply",
             "transcript": result.get("transcript") or "",
             "reply": result.get("reply") or "",
             "agent_used": result.get("agent_used"),
             "language": result.get("language") or "en",
-            "audio_base64": _b64(speech),
+            "audio_base64": None if streamed else _b64(speech),
         }
         await self._send(payload)
         async with self._state:

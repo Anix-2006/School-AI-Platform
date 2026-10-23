@@ -91,6 +91,11 @@
   let liveMute = null;
   let liveActive = false;
   let dropReply = false;
+  let sentenceQueue = [];
+  let sentencePlaying = false;
+  let streamedSentences = false;
+  let speechComplete = false;
+  let ignoreEnded = false;
 
   function selectedGuardian() {
     return guardians.find((item) => String(item.id) === guardianSelect.value) || null;
@@ -381,10 +386,47 @@
     limitTimer = window.setTimeout(stopRecording, MAX_MS);
   }
 
+  function resetSentencePlayback() {
+    sentenceQueue = [];
+    sentencePlaying = false;
+    streamedSentences = false;
+    speechComplete = false;
+  }
+
   function stopPlayback() {
+    ignoreEnded = true;
     player.pause();
     player.hidden = true;
     player.removeAttribute("src");
+    ignoreEnded = false;
+  }
+
+  function finishSentencePlayback() {
+    if (dropReply || sentencePlaying || sentenceQueue.length || !speechComplete) return;
+    if (!liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+    speechComplete = false;
+    streamedSentences = false;
+    liveSocket.send(JSON.stringify({ type: "playback_done" }));
+  }
+
+  function playSentence(audioBase64) {
+    sentencePlaying = true;
+    player.hidden = false;
+    player.src = `data:audio/mpeg;base64,${audioBase64}`;
+    player.play().catch(() => {
+      sentencePlaying = false;
+      pumpSentences();
+    });
+  }
+
+  function pumpSentences() {
+    if (dropReply || sentencePlaying) return;
+    const next = sentenceQueue.shift();
+    if (next) {
+      playSentence(next);
+      return;
+    }
+    finishSentencePlayback();
   }
 
   function sendPcm(buffer) {
@@ -432,14 +474,27 @@
     if (!data || typeof data !== "object") return;
     if (data.type === "status") {
       const labels = { listening: "Listening", thinking: "Thinking", speaking: "Speaking" };
-      if (data.state === "thinking") dropReply = false;
+      if (data.state === "thinking") {
+        dropReply = false;
+        resetSentencePlayback();
+        stopPlayback();
+      }
       setLiveStatus(data.state, labels[data.state] || data.state);
       return;
     }
     if (data.type === "barge_in") {
       dropReply = true;
+      resetSentencePlayback();
       stopPlayback();
       setLiveStatus("listening", "Listening");
+      return;
+    }
+    if (data.type === "sentence") {
+      if (dropReply || !data.audio_base64) return;
+      streamedSentences = true;
+      sentenceQueue.push(data.audio_base64);
+      setLiveStatus("speaking", "Speaking");
+      pumpSentences();
       return;
     }
     if (data.type === "reply") {
@@ -447,10 +502,13 @@
       heard.textContent = data.transcript || "—";
       reply.textContent = data.reply || "";
       clearError();
-      if (data.audio_base64) {
+      speechComplete = true;
+      if (data.audio_base64 && !streamedSentences) {
         player.hidden = false;
         player.src = `data:audio/mpeg;base64,${data.audio_base64}`;
         player.play().catch(() => {});
+      } else if (streamedSentences) {
+        pumpSentences();
       } else {
         player.hidden = true;
         player.removeAttribute("src");
@@ -467,6 +525,7 @@
     const socket = liveSocket;
     liveActive = false;
     dropReply = false;
+    resetSentencePlayback();
     liveSocket = null;
     if (socket && socket.readyState === WebSocket.OPEN) {
       try { socket.send(JSON.stringify({ type: "stop" })); } catch { /* closing */ }
@@ -574,7 +633,12 @@
   }
 
   player.addEventListener("ended", () => {
-    if (dropReply || !liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+    if (ignoreEnded || dropReply || !liveSocket || liveSocket.readyState !== WebSocket.OPEN) return;
+    if (streamedSentences) {
+      sentencePlaying = false;
+      pumpSentences();
+      return;
+    }
     liveSocket.send(JSON.stringify({ type: "playback_done" }));
   });
 

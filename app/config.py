@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     voice_max_seconds: float = 30
     voice_max_bytes: int = 5_242_880
     tts_cache_size: int = 128
+    # How many gTTS requests may run at once while a reply is spoken sentence by sentence.
+    tts_max_parallel: int = 3
+    # Pieces shorter than this are merged into the next sentence ("Ok." stays with what follows).
+    tts_min_sentence_chars: int = 12
     voice_queue_timeout: float = 2.0
     voice_guardian_rate: int = 10
     voice_global_rate: int = 60

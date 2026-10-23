@@ -65,7 +65,16 @@ cannot run longer than `VOICE_MAX_SECONDS`. `VOICE_VAD_SENSITIVITY` is 0–3
 (0 keeps quiet speech, 3 rejects more noise; default 2). Each utterance uses
 the same voice flow as a single recording, on one session so the conversation
 keeps its memory. Speaking while a reply is playing stops playback and cancels
-that reply.
+that reply. Long replies are spoken sentence by sentence. Up to
+`TTS_MAX_PARALLEL` sentences (default 3) are generated at once, each sentence
+is cached on its own, and live playback starts with the first sentence as
+soon as it is ready. A voice note still receives one MP3, joined in the
+original order. To time that speech stage from the repo root (real gTTS, so
+the machine needs network access):
+
+    py -3.11 scripts/benchmark_tts_sentences.py
+
+The script adds the repository root to its own import path.
 
 ## Demo data
 

@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import wave
 from pathlib import Path
 
@@ -225,6 +226,99 @@ def test_live_cancels_a_reply_still_being_prepared(client, live_voice, monkeypat
     assert not holding.release.is_set()
 
 
+class StreamingTts:
+    """Emit a later sentence first internally, then deliver in index order."""
+
+    SUPPORTED_LANGUAGES = {"en", "hi", "te"}
+
+    def speak(self, text, language):
+        return b"ID3speech"
+
+    def speak_streaming(self, text, language, on_sentence, join=True):
+        del text, language, join
+        ready = [
+            (1, "Bring the homework sheet.", b"ID3-1"),
+            (0, "School is closed tomorrow.", b"ID3-0"),
+        ]
+        for index, sentence, audio in sorted(ready):
+            on_sentence(index, sentence, audio)
+        return b""
+
+
+class GatedStreamingTts:
+    """Hold the second sentence so the first can be delivered on its own."""
+
+    def __init__(self):
+        self.release = threading.Event()
+
+    def speak(self, text, language):
+        return b"ID3speech"
+
+    def speak_streaming(self, text, language, on_sentence, join=True):
+        del text, language, join
+        on_sentence(0, "School is closed tomorrow.", b"ID3-0")
+        if not self.release.wait(timeout=5):
+            raise TimeoutError("second sentence was not released")
+        on_sentence(1, "Bring the homework sheet.", b"ID3-1")
+        return b""
+
+
+def test_live_plays_the_first_sentence_before_the_rest_are_ready(client, live_voice):
+    from app.main import app
+
+    gated = GatedStreamingTts()
+    app.state.voice_runtime.service.tts = gated
+    utterances = segmenter_from_settings().push(_pcm()).utterances
+    with client.websocket_connect(f"/voice/live?access_token={_token(client)}") as ws:
+        ws.send_json(
+            {
+                "type": "start",
+                "guardian_id": "g-3-1",
+                "session_id": "early-play",
+                "sample_rate": 16000,
+            }
+        )
+        _take(ws, lambda item: item.get("state") == "listening")
+        ws.send_bytes(utterances[0])
+        first, seen = _take(ws, lambda item: item.get("type") == "sentence" and item.get("index") == 0)
+        assert first["text"] == "School is closed tomorrow."
+        assert first["audio_base64"]
+        assert not any(item.get("type") == "reply" for item in seen)
+        assert not gated.release.is_set()
+        gated.release.set()
+        reply, later = _take(ws, lambda item: item.get("type") == "reply")
+    second = next(item for item in later if item.get("type") == "sentence" and item.get("index") == 1)
+    assert second["text"] == "Bring the homework sheet."
+    assert reply["audio_base64"] is None
+
+
+def test_live_sends_sentences_in_order_before_the_reply(client, live_voice):
+    from app.main import app
+
+    app.state.voice_runtime.service.tts = StreamingTts()
+    utterances = segmenter_from_settings().push(_pcm()).utterances
+    with client.websocket_connect(f"/voice/live?access_token={_token(client)}") as ws:
+        ws.send_json(
+            {
+                "type": "start",
+                "guardian_id": "g-3-1",
+                "session_id": "sentences",
+                "sample_rate": 16000,
+            }
+        )
+        _take(ws, lambda item: item.get("state") == "listening")
+        ws.send_bytes(utterances[0])
+        reply, seen = _take(ws, lambda item: item.get("type") == "reply")
+    sentences = [item for item in seen if item.get("type") == "sentence"]
+    assert [item["index"] for item in sentences] == [0, 1]
+    assert sentences[0]["text"].startswith("School is closed")
+    assert sentences[0]["audio_base64"]
+    assert seen.index(sentences[0]) < seen.index(sentences[1]) < seen.index(reply)
+    assert reply["audio_base64"] is None
+    assert reply["reply"] == "Here is your update."
+    assert any(item.get("state") == "speaking" and seen.index(item) < seen.index(sentences[1]) for item in seen)
+
+
 def test_voice_page_offers_live_conversation(client):
     page = client.get("/flows/voice")
     assert page.status_code == 200
@@ -234,6 +328,9 @@ def test_voice_page_offers_live_conversation(client):
     assert 'data-sample-rate="16000"' in page.text
     assert "__VOICE_SAMPLE_RATE__" not in page.text
     assert "barge_in" in page.text
+    assert 'data.type === "sentence"' in page.text
+    assert "sentenceQueue" in page.text
+    assert "pumpSentences" in page.text
     worklet = client.get("/voice-live-worklet.js")
     assert worklet.status_code == 200
     assert "pcm-sender" in worklet.text
