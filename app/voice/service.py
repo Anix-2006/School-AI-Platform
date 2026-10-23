@@ -90,10 +90,18 @@ class VoiceService:
         session_id: str | None,
         upload_ms: int = 0,
         decode_ms: int = 0,
+        lock_language: bool = False,
+        on_sentence=None,
     ) -> dict:
         self.check_rate("chat", guardian["id"])
         started = time.perf_counter()
         fallback_language = _voice_language(language, guardian)
+        if lock_language:
+            fallback_language = _speakable_language(fallback_language, self.tts)
+        elif fallback_language not in {"en", "hi"}:
+            # Transcript detection still chooses the reply for /voice/chat.
+            # Its empty-audio fallback stays English or Hindi.
+            fallback_language = "en"
         try:
             await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
         except TimeoutError:
@@ -106,7 +114,11 @@ class VoiceService:
                 self._transcribe, audio, stt_language, prompt
             )
             transcribed = time.perf_counter()
-            reply_language = choose_reply_language(transcript)
+            # The browser demo speaks in the guardian's language. Other callers
+            # still follow the transcript.
+            reply_language = (
+                fallback_language if lock_language else choose_reply_language(transcript)
+            )
             if (
                 transcript.duration_seconds is not None
                 and transcript.duration_seconds > self.max_seconds
@@ -124,6 +136,7 @@ class VoiceService:
                     transcribed,
                     upload_ms,
                     decode_ms,
+                    on_sentence=on_sentence,
                 )
             thread_id = (
                 f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
@@ -140,7 +153,7 @@ class VoiceService:
             )
             replied = time.perf_counter()
             spoken_text = clean_for_speech(result["reply"], reply_language)
-            speech = await self._speak(spoken_text, reply_language)
+            speech = await self._speak(spoken_text, reply_language, on_sentence=on_sentence)
             finished = time.perf_counter()
             audio_id = (
                 self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
@@ -199,10 +212,11 @@ class VoiceService:
         transcribed: float,
         upload_ms: int,
         decode_ms: int,
+        on_sentence=None,
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
-        speech = await self._speak(reply, language)
+        speech = await self._speak(reply, language, on_sentence=on_sentence)
         finished = time.perf_counter()
         timings_ms = {
             "upload": upload_ms,
@@ -266,19 +280,53 @@ class VoiceService:
             return self.stt.transcribe(audio, language)
 
     async def _speak(
-        self, text: str, language: str, *, degrade: bool = True
+        self, text: str, language: str, *, degrade: bool = True, on_sentence=None
     ) -> bytes:
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self.tts.speak, text, language),
-                timeout=self.tts_timeout,
-            )
+            if on_sentence is not None and hasattr(self.tts, "speak_streaming"):
+                speak_call = self._stream_speech(text, language, on_sentence)
+            else:
+                speak_call = asyncio.to_thread(self.tts.speak, text, language)
+            return await asyncio.wait_for(speak_call, timeout=self.tts_timeout)
         except ValueError:
             raise
         except Exception:
-            if degrade:
-                return b""
-            raise
+            # A live stream must not look successful after a sentence failed.
+            if on_sentence is not None or not degrade:
+                raise
+            return b""
+
+    async def _stream_speech(self, text: str, language: str, on_sentence) -> bytes:
+        """Run sentence synthesis off the event loop and emit each sentence in order."""
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def emit(index: int, sentence: str, audio: bytes) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, ("sentence", index, sentence, audio))
+
+        def work() -> None:
+            try:
+                audio = self.tts.speak_streaming(
+                    text, language, on_sentence=emit, join=False
+                )
+                loop.call_soon_threadsafe(queue.put_nowait, ("done", audio))
+            except Exception as exc:
+                loop.call_soon_threadsafe(queue.put_nowait, ("error", exc))
+
+        worker = asyncio.create_task(asyncio.to_thread(work))
+        try:
+            while True:
+                item = await queue.get()
+                kind = item[0]
+                if kind == "sentence":
+                    _, index, sentence, audio = item
+                    await on_sentence(index, sentence, audio)
+                elif kind == "done":
+                    return b""
+                else:
+                    raise item[1]
+        finally:
+            await worker
 
     def close(self) -> None:
         close = getattr(self.tts, "close", None)
@@ -299,10 +347,24 @@ def _initial_prompt(student: dict) -> str:
 
 
 def _voice_language(override: str | None, guardian: dict) -> str:
-    if override in {"en", "hi"}:
-        return override
-    preferred = guardian.get("preferred_language")
-    return preferred if preferred in {"en", "hi"} else "en"
+    chosen = override or guardian.get("preferred_language") or "en"
+    code = str(chosen).strip().lower().split("-", 1)[0]
+    return code or "en"
+
+
+def _speakable_language(language: str, tts: object) -> str:
+    """Return a language this engine will actually speak.
+
+    English, Hindi, and Telugu are used when the engine lists them.
+    Any other language is spoken in English. Callers report this spoken
+    language, not the guardian's original choice.
+    """
+    supported = getattr(tts, "SUPPORTED_LANGUAGES", None) or {"en", "hi", "te"}
+    if language in supported:
+        return language
+    if "en" in supported:
+        return "en"
+    return next(iter(supported))
 
 
 def _stt_language(override: str | None, guardian: dict) -> str | None:

@@ -46,6 +46,7 @@
     { href: "/flows/platform-overview", path: "/flows/platform-overview", label: "Platform overview", group: "Explore", icon: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" },
     { href: "/flows/parent-chat", path: "/flows/parent-chat", label: "Parent chat", group: "Parent", icon: "M4 5h16v12H9l-5 3z" },
     { href: "/flows/voice-assistant", path: "/flows/voice-assistant", label: "Voice", group: "Parent", voice: true },
+    { href: "/flows/voice", path: "/flows/voice", label: "Voice demo", group: "Parent", voice: true },
     { href: "/flows/ask-a-helper", path: "/flows/ask-a-helper", label: "Ask a helper", group: "Parent", icon: "M12 3 9.8 8.8 4 11l5.8 2.2L12 19l2.2-5.8L20 11l-5.8-2.2z" },
     { href: "/flows/whatsapp", path: "/flows/whatsapp", label: "WhatsApp", group: "Parent", icon: "M7 18 4 20l1-4a8 8 0 1 1 3 3z" },
     { href: "/flows/teacher-workspace", path: "/flows/teacher-workspace", label: "Teacher workspace", group: "Teacher", icon: "M4 5c4-1 6 0 8 2 2-2 4-3 8-2v14c-4-1-6 0-8 2-2-2-4-3-8-2z" },
