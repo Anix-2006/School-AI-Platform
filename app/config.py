@@ -30,8 +30,10 @@ class Settings(BaseSettings):
     whisper_model: str = "tiny"
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
+    whisper_cpu_threads: int = 1
+    whisper_num_workers: int = 1
     voice_max_concurrency: int = 1
-    voice_max_seconds: float = 30
+    voice_max_seconds: float = 10
     voice_max_bytes: int = 5_242_880
     tts_cache_size: int = 128
     voice_queue_timeout: float = 2.0

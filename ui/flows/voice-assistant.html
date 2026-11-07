@@ -107,7 +107,7 @@
 
   let silenceMs = 700;
   let idleMs = 20000;
-  const MAX_MS = 30000;
+  let maxMs = 10000;
   const stateLabel = document.getElementById("voiceState");
   const hint = document.getElementById("voiceHint");
   const stage = document.getElementById("voiceStage");
@@ -251,6 +251,7 @@
     if (mode === "listening" && !muted) {
       const threshold = now - lastPlaybackEndedAt < PLAYBACK_COOLDOWN_MS ? 0.07 : 0.045;
       if (level > threshold) {
+        beginRecording();
         speechCandidateAt ||= now;
         if (now - speechCandidateAt >= SPEECH_CONFIRM_MS) {
           if (!heardSpeech) speechDetectedAt = now;
@@ -260,7 +261,9 @@
       } else if (heardSpeech && now - lastLoudAt >= silenceMs) {
         if (now - speechDetectedAt >= MIN_SPEECH_MS) finishTurn();
       } else if (!heardSpeech) {
+        const rejectedNoise = speechCandidateAt > 0;
         speechCandidateAt = 0;
+        if (rejectedNoise && recorder?.state === "recording") recorder.stop();
         if (Date.now() - idleSince >= idleMs) handleIdle();
       }
     } else if (mode === "speaking" && level > 0.11) {
@@ -288,6 +291,7 @@
       ]);
       silenceMs = Number(voiceStatus?.vad_silence_ms) || silenceMs;
       idleMs = (Number(voiceStatus?.idle_prompt_seconds) || 20) * 1000;
+      maxMs = Math.min((Number(voiceStatus?.max_seconds) || 10) * 1000, 10000);
       await ensureStream();
       stopped = false;
       idlePrompted = false;
@@ -312,6 +316,11 @@
     idleSince = Date.now();
     chunks = [];
     cancelledTurn = false;
+    setMode("listening");
+  }
+
+  function beginRecording() {
+    if (mode !== "listening" || stopped || muted || requestInFlight || recorder) return;
     const type = mimeType();
     recorder = type
       ? new MediaRecorder(stream, { mimeType: type, audioBitsPerSecond: 24000 })
@@ -321,10 +330,9 @@
     });
     recorder.addEventListener("stop", processTurn, { once: true });
     recorder.start(200);
-    setMode("listening");
     window.setTimeout(() => {
       if (recorder?.state === "recording" && mode === "listening") finishTurn();
-    }, MAX_MS);
+    }, maxMs);
   }
 
   function finishTurn() {

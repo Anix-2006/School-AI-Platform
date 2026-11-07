@@ -31,6 +31,8 @@ class VoiceRuntime:
                     settings.whisper_model,
                     device=settings.whisper_device,
                     compute_type=settings.whisper_compute_type,
+                    cpu_threads=settings.whisper_cpu_threads,
+                    num_workers=settings.whisper_num_workers,
                 )
                 await asyncio.to_thread(stt.warmup)
                 tts = GttsEngine(
@@ -60,6 +62,7 @@ class VoiceRuntime:
             "status": self.state,
             "vad_silence_ms": settings.voice_vad_silence_ms,
             "idle_prompt_seconds": settings.voice_idle_prompt_seconds,
+            "max_seconds": settings.voice_max_seconds,
         }
 
     def close(self) -> None:
