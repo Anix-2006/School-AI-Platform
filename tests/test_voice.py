@@ -528,7 +528,8 @@ def test_hands_free_voice_page_and_mascot_assets_are_served(client):
     assert "Start voice assistant" in page.text
     assert "vaani-mascot" in page.text
     assert "requestInFlight" in page.text
-    assert "preSpeechChunks.length > 3" in page.text
+    assert "if (event.data.size) chunks.push(event.data);" in page.text
+    assert "preSpeechChunks" not in page.text
     assert "PLAYBACK_COOLDOWN_MS" in page.text
     assert "onclick=" not in page.text
     for size in (32, 512):
