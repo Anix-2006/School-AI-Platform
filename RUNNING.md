@@ -45,7 +45,7 @@ voice model, limits, and audio cache in one process. Close
   60 seconds.
 - `VOICE_TTS_TIMEOUT=4.0`: seconds per gTTS attempt; one retry is made.
 - `VOICE_AUDIO_TTL=300.0`: generated chat audio lifetime in process memory.
-- `VOICE_VAD_SILENCE_MS=800`: browser silence interval that ends a turn.
+- `VOICE_VAD_SILENCE_MS=700`: browser silence interval that ends a turn.
 - `VOICE_IDLE_PROMPT_SECONDS=20`: silence before Vaani asks if the parent is
   still present.
 

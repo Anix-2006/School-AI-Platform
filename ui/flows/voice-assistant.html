@@ -45,51 +45,13 @@
     </select>
 
     <div class="voice-stage" id="voiceStage" data-state="waving">
-      <svg class="vaani-mascot" viewBox="0 0 240 220" role="img" aria-label="Vaani, the School Parent AI voice assistant">
-        <g class="vaani-ring">
-          <circle cx="120" cy="108" r="92"/>
-          <circle cx="120" cy="108" r="78"/>
-        </g>
-        <g class="vaani-float">
-          <g class="vaani-antenna">
-            <path d="M120 39V19l13-9"/>
-            <circle cx="137" cy="8" r="8"/>
-          </g>
-          <g class="vaani-arms">
-            <path class="vaani-arm-left" d="M64 117q-32 6-36 34"/>
-            <path class="vaani-arm-right" d="M176 117q27-5 35-29"/>
-            <circle cx="27" cy="155" r="9"/>
-            <circle cx="212" cy="83" r="9"/>
-          </g>
-          <path class="vaani-body" d="M55 91c0-43 28-70 65-70s65 27 65 70v50c0 40-27 66-65 66s-65-26-65-66V91Z"/>
-          <path class="vaani-face" d="M72 91c0-31 20-49 48-49s48 18 48 49v28c0 28-21 49-48 49s-48-21-48-49V91Z"/>
-          <g class="vaani-eyes">
-            <ellipse cx="98" cy="103" rx="13" ry="16"/>
-            <ellipse cx="142" cy="103" rx="13" ry="16"/>
-            <circle cx="101" cy="100" r="4"/>
-            <circle cx="145" cy="100" r="4"/>
-          </g>
-          <path class="vaani-brow" d="M84 82q14-9 28 0M128 82q14-9 28 0"/>
-          <path class="vaani-mouth" d="M106 132q14 13 28 0"/>
-          <g class="vaani-headset">
-            <path d="M72 102a48 48 0 0 1 96 0"/>
-            <rect x="60" y="99" width="16" height="35" rx="8"/>
-            <rect x="164" y="99" width="16" height="35" rx="8"/>
-            <path d="M172 130q-2 18-25 20"/>
-            <circle cx="144" cy="150" r="5"/>
-          </g>
-          <g class="vaani-pocket">
-            <path d="M92 171h56v27H92z"/>
-            <path d="M120 178v12M114 184h12"/>
-          </g>
-          <g class="vaani-dots">
-            <circle cx="104" cy="136" r="4"/>
-            <circle cx="120" cy="136" r="4"/>
-            <circle cx="136" cy="136" r="4"/>
-          </g>
-        </g>
-      </svg>
-      <span class="vaani-name">Vaani</span>
+      <div class="shizuka-avatar">
+        <img class="vaani-mascot shizuka-photo" src="/voice-mascot-512.png" alt="Shizuka voice assistant">
+        <span class="shizuka-mouth-motion" aria-hidden="true"></span>
+        <span class="shizuka-ear-signal" aria-hidden="true"></span>
+        <span class="shizuka-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <span class="vaani-name">Shizuka</span>
       <strong id="voiceState">Ready when you are</strong>
       <p id="voiceHint">Tap once to start. After that, just speak naturally.</p>
       <div class="voice-energy-wrap">
@@ -143,8 +105,8 @@
 (() => {
   "use strict";
 
-  const SILENCE_MS = 800;
-  const IDLE_MS = 20000;
+  let silenceMs = 700;
+  let idleMs = 20000;
   const MAX_MS = 30000;
   const stateLabel = document.getElementById("voiceState");
   const hint = document.getElementById("voiceHint");
@@ -169,21 +131,29 @@
   let stream = null;
   let recorder = null;
   let chunks = [];
+  let preSpeechChunks = [];
   let audioContext = null;
   let analyser = null;
   let analyserData = null;
   let meterFrame = 0;
   let playbackSource = null;
   let requestController = null;
+  let requestInFlight = false;
   let heardSpeech = false;
   let speechStartedAt = 0;
+  let speechCandidateAt = 0;
+  let speechDetectedAt = 0;
   let lastLoudAt = 0;
+  let lastPlaybackEndedAt = 0;
   let idleSince = 0;
   let idlePrompted = false;
   let muted = false;
   let stopped = true;
   let cancelledTurn = false;
   let sessionId = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const MIN_SPEECH_MS = 350;
+  const SPEECH_CONFIRM_MS = 180;
+  const PLAYBACK_COOLDOWN_MS = 500;
 
   const labels = {
     en: {
@@ -280,13 +250,19 @@
     stage.style.setProperty("--mouth-scale", String(Math.min(2.6, 0.7 + level * 15)));
     const now = performance.now();
     if (mode === "listening" && !muted) {
-      if (level > 0.035) {
-        heardSpeech = true;
-        lastLoudAt = now;
-      } else if (heardSpeech && now - lastLoudAt >= SILENCE_MS) {
-        finishTurn();
-      } else if (!heardSpeech && Date.now() - idleSince >= IDLE_MS) {
-        handleIdle();
+      const threshold = now - lastPlaybackEndedAt < PLAYBACK_COOLDOWN_MS ? 0.07 : 0.045;
+      if (level > threshold) {
+        speechCandidateAt ||= now;
+        if (now - speechCandidateAt >= SPEECH_CONFIRM_MS) {
+          if (!heardSpeech) speechDetectedAt = now;
+          heardSpeech = true;
+          lastLoudAt = now;
+        }
+      } else if (heardSpeech && now - lastLoudAt >= silenceMs) {
+        if (now - speechDetectedAt >= MIN_SPEECH_MS) finishTurn();
+      } else if (!heardSpeech) {
+        speechCandidateAt = 0;
+        if (Date.now() - idleSince >= idleMs) handleIdle();
       }
     } else if (mode === "speaking" && level > 0.11) {
       if (!speechStartedAt) speechStartedAt = now;
@@ -306,7 +282,13 @@
     try {
       startButton.disabled = true;
       setMode("thinking", "Waking up the server. This can take up to a minute.");
-      await Promise.all([SchoolAPI.health(), SchoolAPI.voiceStatus(), unlockAudio()]);
+      const [, voiceStatus] = await Promise.all([
+        SchoolAPI.health(),
+        SchoolAPI.voiceStatus(),
+        unlockAudio(),
+      ]);
+      silenceMs = Number(voiceStatus?.vad_silence_ms) || silenceMs;
+      idleMs = (Number(voiceStatus?.idle_prompt_seconds) || 20) * 1000;
       await ensureStream();
       stopped = false;
       idlePrompted = false;
@@ -322,19 +304,32 @@
   }
 
   function startListening(resetIdle = true) {
-    if (stopped || muted || recorder?.state === "recording") return;
+    if (stopped || muted || requestInFlight || recorder?.state === "recording") return;
     if (resetIdle) idlePrompted = false;
     heardSpeech = false;
+    speechCandidateAt = 0;
+    speechDetectedAt = 0;
     lastLoudAt = performance.now();
     idleSince = Date.now();
     chunks = [];
+    preSpeechChunks = [];
     cancelledTurn = false;
     const type = mimeType();
     recorder = type
       ? new MediaRecorder(stream, { mimeType: type, audioBitsPerSecond: 24000 })
       : new MediaRecorder(stream);
     recorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size) chunks.push(event.data);
+      if (!event.data.size) return;
+      if (!heardSpeech) {
+        preSpeechChunks.push(event.data);
+        if (preSpeechChunks.length > 3) preSpeechChunks.shift();
+        return;
+      }
+      if (preSpeechChunks.length) {
+        chunks.push(...preSpeechChunks);
+        preSpeechChunks = [];
+      }
+      chunks.push(event.data);
     });
     recorder.addEventListener("stop", processTurn, { once: true });
     recorder.start(200);
@@ -353,6 +348,7 @@
   async function processTurn() {
     const parts = chunks.slice();
     chunks = [];
+    preSpeechChunks = [];
     recorder = null;
     if (cancelledTurn || stopped) return;
     if (!heardSpeech || !parts.length) {
@@ -372,6 +368,7 @@
     form.append("student_id", String(selected.student_id));
     form.append("session_id", sessionId);
     requestController = new AbortController();
+    requestInFlight = true;
     try {
       const data = await SchoolAPI.voiceChat(form, requestController.signal);
       transcriptText.textContent = data.transcript || "—";
@@ -387,6 +384,7 @@
       if (error?.name === "AbortError" || stopped) return;
       showError(error.message || "The voice question could not be processed.");
     } finally {
+      requestInFlight = false;
       requestController = null;
     }
   }
@@ -400,7 +398,11 @@
     playbackSource.connect(audioContext.destination);
     playbackSource.addEventListener("ended", () => {
       playbackSource = null;
-      if (resumeListening && !stopped && mode === "speaking") startListening();
+      lastPlaybackEndedAt = performance.now();
+      if (resumeListening && !stopped && mode === "speaking") {
+        setMode("idle", "Preparing to listen…");
+        window.setTimeout(() => startListening(), PLAYBACK_COOLDOWN_MS);
+      }
     }, { once: true });
     setMode("speaking");
     playbackSource.start();

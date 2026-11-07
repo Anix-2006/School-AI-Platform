@@ -278,6 +278,7 @@ def test_short_queue_rejects_excess_concurrency(monkeypatch):
         with pytest.raises(VoiceError) as busy:
             await service.chat(**kwargs)
         assert busy.value.status_code == 429
+        assert "processing another request" in busy.value.detail
         await first
 
     asyncio.run(run())
@@ -291,6 +292,7 @@ def test_global_and_guardian_rates_return_429():
     with pytest.raises(VoiceError) as guardian_limit:
         service.check_rate("chat", "g-1")
     assert guardian_limit.value.status_code == 429
+    assert "wait up to one minute" in guardian_limit.value.detail
     service.check_rate("chat", "g-2")
     with pytest.raises(VoiceError) as global_limit:
         service.check_rate("chat", "g-3")
@@ -323,6 +325,7 @@ def test_voice_api_auth_access_history_response_and_download(
     )
     assert response.status_code == 200
     body = response.json()
+    assert "stt;dur=" in response.headers["server-timing"]
     assert set(body) == {
         "transcript",
         "reply",
@@ -524,6 +527,9 @@ def test_hands_free_voice_page_and_mascot_assets_are_served(client):
     assert page.status_code == 200
     assert "Start voice assistant" in page.text
     assert "vaani-mascot" in page.text
+    assert "requestInFlight" in page.text
+    assert "preSpeechChunks.length > 3" in page.text
+    assert "PLAYBACK_COOLDOWN_MS" in page.text
     assert "onclick=" not in page.text
     for size in (32, 512):
         image = client.get(f"/voice-mascot-{size}.png")

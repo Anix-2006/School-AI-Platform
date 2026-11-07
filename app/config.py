@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     voice_speak_rate: int = 20
     voice_tts_timeout: float = 4.0
     voice_audio_ttl: float = 300.0
-    voice_vad_silence_ms: int = 800
+    voice_vad_silence_ms: int = 700
     voice_idle_prompt_seconds: int = 20
 
 
