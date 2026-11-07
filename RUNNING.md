@@ -34,8 +34,10 @@ voice model, limits, and audio cache in one process. Close
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
 - `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
+- `WHISPER_CPU_THREADS=1` and `WHISPER_NUM_WORKERS=1`: avoid CPU
+  oversubscription on a single-core/free-tier instance.
 - `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
-- `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
+- `VOICE_MAX_SECONDS=10` and `VOICE_MAX_BYTES=5242880`: upload limits.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
 - `VOICE_QUEUE_TIMEOUT=2.0`: seconds to wait for a voice job slot.
 - `VOICE_GUARDIAN_RATE=10`: voice-chat requests per guardian per 60 seconds.

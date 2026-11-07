@@ -36,10 +36,20 @@ class WhisperSTT:
         model_name: str | None = None,
         device: str | None = None,
         compute_type: str | None = None,
+        cpu_threads: int | None = None,
+        num_workers: int | None = None,
     ):
         self.model_name = model_name or settings.whisper_model
         self.device = device or settings.whisper_device
         self.compute_type = compute_type or settings.whisper_compute_type
+        self.cpu_threads = max(
+            1,
+            settings.whisper_cpu_threads if cpu_threads is None else cpu_threads,
+        )
+        self.num_workers = max(
+            1,
+            settings.whisper_num_workers if num_workers is None else num_workers,
+        )
         self._model = None
         self._load_lock = threading.Lock()
 
@@ -54,6 +64,8 @@ class WhisperSTT:
                     self.model_name,
                     device=self.device,
                     compute_type=self.compute_type,
+                    cpu_threads=self.cpu_threads,
+                    num_workers=self.num_workers,
                 )
 
     def warmup(self) -> None:

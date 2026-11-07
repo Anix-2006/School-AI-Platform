@@ -15,7 +15,7 @@ from app.voice.service import (
     audio_owner_key,
     choose_reply_language,
 )
-from app.voice.stt import Transcript
+from app.voice.stt import Transcript, WhisperSTT
 from app.voice.storage import AudioStore
 
 
@@ -102,6 +102,25 @@ def test_audio_validation_is_in_memory_and_bounded():
     with pytest.raises(AudioValidationError) as wrong_type:
         validate_audio(b"not audio", "text/plain", max_bytes=100, max_seconds=1)
     assert wrong_type.value.status_code == 415
+
+
+def test_whisper_uses_single_cpu_thread_and_worker(monkeypatch):
+    created = {}
+
+    class FakeWhisperModel:
+        def __init__(self, model_name, **kwargs):
+            created.update(model_name=model_name, **kwargs)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "faster_whisper",
+        types.SimpleNamespace(WhisperModel=FakeWhisperModel),
+    )
+    engine = WhisperSTT("tiny", cpu_threads=1, num_workers=1)
+    engine.load()
+    assert created["model_name"] == "tiny"
+    assert created["cpu_threads"] == 1
+    assert created["num_workers"] == 1
 
 
 def test_non_wav_duration_uses_in_memory_decoder(monkeypatch):
@@ -530,6 +549,8 @@ def test_hands_free_voice_page_and_mascot_assets_are_served(client):
     assert "requestInFlight" in page.text
     assert "if (event.data.size) chunks.push(event.data);" in page.text
     assert "preSpeechChunks" not in page.text
+    assert "beginRecording();" in page.text
+    assert "let maxMs = 10000;" in page.text
     assert "PLAYBACK_COOLDOWN_MS" in page.text
     assert "onclick=" not in page.text
     for size in (32, 512):
