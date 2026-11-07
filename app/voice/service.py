@@ -198,6 +198,92 @@ class VoiceService:
         finally:
             self._slots.release()
 
+    async def text_chat(
+        self,
+        *,
+        tenant_id: str,
+        guardian: dict,
+        student: dict,
+        transcript: str,
+        language: str | None,
+        session_id: str | None,
+    ) -> dict:
+        """Run a browser-transcribed voice turn without server STT or TTS."""
+        started = time.perf_counter()
+        try:
+            await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
+        except TimeoutError:
+            operations_logger.warning(
+                "voice_rejected reason=queue_busy guardian_id=%s timeout_seconds=%.2f",
+                guardian["id"],
+                self.queue_timeout,
+            )
+            raise VoiceError(
+                429, "Voice service is processing another request. Please try again."
+            ) from None
+        queued = time.perf_counter()
+        try:
+            self.check_rate("chat", guardian["id"])
+            reply_language = choose_reply_language(
+                Transcript(
+                    text=transcript,
+                    language=language,
+                    duration_seconds=None,
+                )
+            )
+            thread_id = (
+                f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
+            )
+            result = await asyncio.to_thread(
+                run_parent_turn,
+                tenant_id,
+                guardian,
+                student,
+                transcript,
+                "voice",
+                thread_id,
+                reply_language,
+            )
+            finished = time.perf_counter()
+            router_ms = int(result.get("router_ms") or 0)
+            agent_ms = int(
+                result.get("agent_llm_ms")
+                or max(0, round((finished - queued) * 1000) - router_ms)
+            )
+            timings_ms = {
+                "upload": 0,
+                "decode": 0,
+                "queue": round((queued - started) * 1000),
+                "stt": 0,
+                "router": router_ms,
+                "agent_llm": agent_ms,
+                "tts": 0,
+            }
+            timings_ms["total"] = sum(timings_ms.values())
+            operations_logger.info(
+                "voice_text_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
+                guardian["id"],
+                session_id or "default",
+                reply_language,
+                timings_ms,
+            )
+            return {
+                **result,
+                "language": reply_language,
+                "transcript": transcript,
+                "audio_id": None,
+                "timings": {
+                    "queue": timings_ms["queue"],
+                    "stt": 0,
+                    "llm": timings_ms["router"] + timings_ms["agent_llm"],
+                    "tts": 0,
+                    "total": timings_ms["total"],
+                },
+                "timings_ms": timings_ms,
+            }
+        finally:
+            self._slots.release()
+
     async def _friendly_retry(
         self,
         transcript: Transcript,

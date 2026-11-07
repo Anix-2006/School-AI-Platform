@@ -24,6 +24,14 @@ class SpeakRequest(BaseModel):
     language: Language = "en"
 
 
+class VoiceTextRequest(BaseModel):
+    guardian_id: str = Field(min_length=1)
+    student_id: str = Field(min_length=1)
+    transcript: str = Field(min_length=1, max_length=2000)
+    language: Language | None = None
+    session_id: str | None = Field(default=None, max_length=200)
+
+
 class VoiceTimings(BaseModel):
     stt: int
     llm: int
@@ -163,6 +171,43 @@ async def voice_chat(
         )
         return result
     except (AudioValidationError, VoiceError) as exc:
+        headers = None
+        if exc.status_code == 429:
+            headers = {"Retry-After": "2" if "another request" in exc.detail else "60"}
+        raise HTTPException(exc.status_code, exc.detail, headers=headers) from None
+
+
+@router.post("/text-chat", response_model=VoiceChatResponse)
+async def voice_text_chat(
+    body: VoiceTextRequest,
+    request: Request,
+    response: Response,
+    tenant_id: str = Depends(get_current_tenant),
+):
+    transcript = body.transcript.strip()
+    if not transcript:
+        raise HTTPException(422, "transcript is required")
+    try:
+        guardian, student = resolve_parent(
+            tenant_id, body.guardian_id, body.student_id
+        )
+        result = await _service(request).text_chat(
+            tenant_id=tenant_id,
+            guardian=guardian,
+            student=student,
+            transcript=transcript,
+            language=body.language,
+            session_id=body.session_id,
+        )
+        timings = result["timings_ms"]
+        response.headers["Server-Timing"] = ", ".join(
+            f"{name};dur={timings[name]}"
+            for name in ("queue", "router", "agent_llm")
+        )
+        return result
+    except ChatAccessError as exc:
+        raise HTTPException(exc.status_code, exc.detail) from None
+    except VoiceError as exc:
         headers = None
         if exc.status_code == 429:
             headers = {"Retry-After": "2" if "another request" in exc.detail else "60"}
