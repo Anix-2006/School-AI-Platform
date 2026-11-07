@@ -14,6 +14,7 @@ class FakeGraph:
         return {
             "messages": [*state["messages"], AIMessage(content=self.reply)],
             "route_to": self.route,
-            "intent_source": "llm_router",
+            # Production router_node reports only "classifier" or "llm".
+            "intent_source": "llm",
             "intent_confidence": None,
         }

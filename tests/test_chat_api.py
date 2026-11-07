@@ -105,7 +105,42 @@ def test_turn_is_saved_to_conversations_and_messages(client, graph, store):
     messages = store.find("messages", conversation_id=conversations[0]["id"])
     assert [m["role"] for m in messages] == ["user", "assistant", "user", "assistant"]
     assert messages[0]["content"] == "First question"
+    assert messages[0]["student_id"] == "s-3-1"
+    assert messages[1]["student_id"] == "s-3-1"
     assert messages[1]["agent"] == "daily_update"
+    assert messages[0]["intent_source"] == "llm"
+    assert messages[1]["intent_confidence"] is None
+
+
+def test_turn_metadata_follows_route_and_intent(client, store, monkeypatch):
+    from langchain_core.messages import AIMessage
+
+    class Sequenced:
+        def __init__(self):
+            self.pending = [
+                {"route_to": "parent_teacher", "intent_source": "classifier", "intent_confidence": 0.96},
+                {"route_to": "communication", "intent_source": "llm", "intent_confidence": None},
+            ]
+
+        def invoke(self, state, config=None):
+            spec = self.pending.pop(0)
+            return {"messages": [*state["messages"], AIMessage(content="Saved reply.")], **spec}
+
+    monkeypatch.setattr(chat_service, "orchestrator_graph", Sequenced())
+    assert client.post("/chat", json={"guardian_id": PRIYA, "message": "Who teaches Maths?"}).status_code == 200
+    assert client.post("/chat", json={"guardian_id": PRIYA, "message": "Thank you"}).status_code == 200
+
+    messages = store.find("messages", conversation_id=store.find("conversations", guardian_id=PRIYA)[0]["id"])
+    parent, assistant = messages[0], messages[1]
+    assert parent["student_id"] == assistant["student_id"] == "s-3-1"
+    assert parent["intent_source"] == assistant["intent_source"] == "classifier"
+    assert parent["intent_confidence"] == assistant["intent_confidence"] == 0.96
+    assert assistant["agent"] == "parent_teacher"
+    fallback_user, fallback_assistant = messages[2], messages[3]
+    assert fallback_user["intent_source"] == fallback_assistant["intent_source"] == "llm"
+    assert fallback_user["intent_confidence"] is None
+    assert fallback_assistant["agent"] == "communication"
+    assert fallback_assistant["content"] == "Saved reply."
 
 
 def test_reply_still_returned_when_workbook_is_locked(client, graph, monkeypatch):
