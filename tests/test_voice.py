@@ -375,6 +375,66 @@ def test_voice_api_auth_access_history_response_and_download(
     assert client.get(f"/voice/audio/{audio_id}", params={"guardian_id": "g-3-1"}).status_code == 404
 
 
+def test_voice_text_chat_skips_server_stt_and_tts(client, monkeypatch):
+    from app.main import app
+    from app.services import chat_service
+    from tests.fakes import FakeGraph
+
+    graph = FakeGraph()
+    monkeypatch.setattr(chat_service, "orchestrator_graph", graph)
+    stt = FakeStt()
+    tts = FakeTts()
+    app.state.voice_runtime = FakeRuntime(VoiceService(stt, tts, AudioStore()))
+
+    response = client.post(
+        "/voice/text-chat",
+        json={
+            "guardian_id": "g-3-1",
+            "student_id": "s-3-1",
+            "transcript": "आज का होमवर्क क्या है?",
+            "language": "en",
+            "session_id": "browser-voice",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["language"] == "hi"
+    assert response.json()["audio_id"] is None
+    assert "router;dur=" in response.headers["server-timing"]
+    assert stt.calls == 0
+    assert tts.calls == []
+    assert graph.calls[0]["state"]["channel"] == "voice"
+    assert graph.calls[0]["state"]["reply_language"] == "hi"
+
+
+@pytest.mark.parametrize(
+    ("guardian_id", "student_id", "status"),
+    [
+        ("g-nobody", "s-3-1", 404),
+        ("g-7-1", "s-7-1", 403),
+        ("g-3-1", "s-5-1", 403),
+    ],
+)
+def test_voice_text_chat_keeps_parent_access_checks(
+    client, guardian_id, student_id, status
+):
+    from app.main import app
+
+    app.state.voice_runtime = FakeRuntime(
+        VoiceService(FakeStt(), FakeTts(), AudioStore())
+    )
+    response = client.post(
+        "/voice/text-chat",
+        json={
+            "guardian_id": guardian_id,
+            "student_id": student_id,
+            "transcript": "Any homework?",
+            "language": "en",
+        },
+    )
+    assert response.status_code == status
+
+
 def test_access_is_resolved_before_stt(client):
     from app.main import app
 

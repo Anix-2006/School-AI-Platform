@@ -531,6 +531,17 @@
         signal,
       });
     },
+    async voiceTextChat(payload, signal = null) {
+      await ensureAuth();
+      return request("/voice/text-chat", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        auth: true,
+        timeout: 30000,
+        announceErrors: false,
+        signal,
+      });
+    },
     async voiceAudio(audioId, guardianId) {
       await ensureAuth();
       const id = encodeURIComponent(audioId);

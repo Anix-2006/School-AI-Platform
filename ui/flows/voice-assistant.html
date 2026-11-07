@@ -89,7 +89,7 @@
         <span>Stop</span>
       </button>
     </div>
-    <p class="voice-privacy-copy">Voice is processed to answer your question and is not stored as audio.</p>
+    <p class="voice-privacy-copy">When supported, your browser's speech provider transcribes your voice. This app does not store the audio.</p>
     <div id="voiceError" class="error retry-row" role="alert" hidden>
       <span id="voiceErrorText"></span>
       <button type="button" class="secondary" id="retryVoice">Try again</button>
@@ -108,6 +108,10 @@
   let silenceMs = 700;
   let idleMs = 20000;
   let maxMs = 10000;
+  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let hybridEnabled = Boolean(
+    SpeechRecognitionClass && window.speechSynthesis && window.SpeechSynthesisUtterance
+  );
   const stateLabel = document.getElementById("voiceState");
   const hint = document.getElementById("voiceHint");
   const stage = document.getElementById("voiceStage");
@@ -136,6 +140,10 @@
   let analyserData = null;
   let meterFrame = 0;
   let playbackSource = null;
+  let recognition = null;
+  let recognitionActive = false;
+  let recognitionHandled = false;
+  let speechUtterance = null;
   let requestController = null;
   let requestInFlight = false;
   let heardSpeech = false;
@@ -186,6 +194,10 @@
 
   function context() {
     return contexts.find((item) => String(item.id) === guardianSelect.value);
+  }
+
+  function useGuardianLanguage() {
+    languageChip.textContent = context()?.preferred_language === "hi" ? "हिं" : "EN";
   }
 
   function mimeType() {
@@ -248,7 +260,7 @@
     energyMeter.setAttribute("aria-valuenow", String(meterValue));
     stage.style.setProperty("--mouth-scale", String(Math.min(2.6, 0.7 + level * 15)));
     const now = performance.now();
-    if (mode === "listening" && !muted) {
+    if (mode === "listening" && !muted && !hybridEnabled) {
       const threshold = now - lastPlaybackEndedAt < PLAYBACK_COOLDOWN_MS ? 0.07 : 0.045;
       if (level > threshold) {
         beginRecording();
@@ -277,8 +289,8 @@
 
   async function startAssistant() {
     errorBox.hidden = true;
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      showError("This browser does not support microphone recording.");
+    if (!navigator.mediaDevices?.getUserMedia || (!hybridEnabled && !window.MediaRecorder)) {
+      showError("This browser does not support voice input.");
       return;
     }
     try {
@@ -317,6 +329,69 @@
     chunks = [];
     cancelledTurn = false;
     setMode("listening");
+    if (hybridEnabled) startBrowserRecognition();
+  }
+
+  function startBrowserRecognition() {
+    if (!hybridEnabled || stopped || muted || requestInFlight || mode !== "listening") return;
+    recognition ||= createRecognition();
+    recognition.lang = currentLanguage() === "hi" ? "hi-IN" : "en-IN";
+    recognitionHandled = false;
+    try {
+      recognition.start();
+    } catch (error) {
+      if (error?.name !== "InvalidStateError") useRecordingFallback();
+    }
+  }
+
+  function createRecognition() {
+    const instance = new SpeechRecognitionClass();
+    instance.continuous = false;
+    instance.interimResults = true;
+    instance.maxAlternatives = 1;
+    instance.addEventListener("start", () => {
+      recognitionActive = true;
+    });
+    instance.addEventListener("result", (event) => {
+      const result = event.results[event.results.length - 1];
+      const text = Array.from(event.results)
+        .map((item) => item[0]?.transcript || "")
+        .join(" ")
+        .trim();
+      if (text) transcriptText.textContent = text;
+      if (result?.isFinal && text && !recognitionHandled) {
+        recognitionHandled = true;
+        recognitionActive = false;
+        processTextTurn(text);
+      }
+    });
+    instance.addEventListener("error", (event) => {
+      recognitionActive = false;
+      if (!["no-speech", "aborted"].includes(event.error)) useRecordingFallback();
+    });
+    instance.addEventListener("end", () => {
+      recognitionActive = false;
+      if (
+        hybridEnabled && !recognitionHandled && !stopped && !muted
+        && mode === "listening" && !requestInFlight
+      ) {
+        if (Date.now() - idleSince >= idleMs) handleIdle();
+        else window.setTimeout(startBrowserRecognition, 200);
+      }
+    });
+    return instance;
+  }
+
+  function useRecordingFallback() {
+    if (!hybridEnabled) return;
+    hybridEnabled = false;
+    recognitionActive = false;
+    if (!window.MediaRecorder) {
+      showError("Browser speech recognition is unavailable.");
+      return;
+    }
+    setMode("idle", "Using the compatible voice mode.");
+    window.setTimeout(() => startListening(false), 250);
   }
 
   function beginRecording() {
@@ -384,6 +459,68 @@
     }
   }
 
+  async function processTextTurn(text) {
+    const selected = context();
+    if (!selected) {
+      showError("Choose a linked child before starting voice mode.");
+      return;
+    }
+    recognitionActive = false;
+    setMode("thinking");
+    requestController = new AbortController();
+    requestInFlight = true;
+    try {
+      const data = await SchoolAPI.voiceTextChat({
+        guardian_id: String(selected.id),
+        student_id: String(selected.student_id),
+        transcript: text,
+        language: currentLanguage(),
+        session_id: sessionId,
+      }, requestController.signal);
+      transcriptText.textContent = data.transcript || text;
+      replyText.textContent = data.reply || "—";
+      languageChip.textContent = data.language === "hi" ? "हिं" : "EN";
+      if (!speakBrowserText(data.reply, data.language, true)) {
+        const blob = await SchoolAPI.voiceSpeak(data.reply, data.language);
+        await playBlob(blob, true);
+      }
+    } catch (error) {
+      if (error?.name === "AbortError" || stopped) return;
+      showError(error.message || "The voice question could not be processed.");
+    } finally {
+      requestInFlight = false;
+      requestController = null;
+    }
+  }
+
+  function speakBrowserText(text, language, resumeListening) {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance || !text) return false;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language === "hi" ? "hi-IN" : "en-IN";
+    utterance.rate = 1.05;
+    const voice = window.speechSynthesis.getVoices().find(
+      (item) => item.lang.toLowerCase() === utterance.lang.toLowerCase()
+    );
+    if (voice) utterance.voice = voice;
+    utterance.addEventListener("end", () => finishBrowserSpeech(utterance, resumeListening));
+    utterance.addEventListener("error", () => finishBrowserSpeech(utterance, resumeListening));
+    speechUtterance = utterance;
+    setMode("speaking");
+    window.speechSynthesis.speak(utterance);
+    return true;
+  }
+
+  function finishBrowserSpeech(utterance, resumeListening) {
+    if (speechUtterance !== utterance) return;
+    speechUtterance = null;
+    lastPlaybackEndedAt = performance.now();
+    if (resumeListening && !stopped && mode === "speaking") {
+      setMode("idle", "Preparing to listen…");
+      window.setTimeout(() => startListening(), PLAYBACK_COOLDOWN_MS);
+    }
+  }
+
   async function playBlob(blob, resumeListening) {
     const bytes = await blob.arrayBuffer();
     const buffer = await audioContext.decodeAudioData(bytes.slice(0));
@@ -414,6 +551,7 @@
     if (recorder?.state === "recording") recorder.stop();
     try {
       const phrase = labels[currentLanguage()].idlePrompt;
+      if (hybridEnabled && speakBrowserText(phrase, currentLanguage(), true)) return;
       const blob = await SchoolAPI.voiceSpeak(phrase, currentLanguage());
       await playBlob(blob, true);
     } catch {
@@ -425,6 +563,8 @@
     if (mode !== "speaking") return;
     playbackSource?.stop();
     playbackSource = null;
+    window.speechSynthesis?.cancel();
+    speechUtterance = null;
     requestController?.abort();
     startListening();
   }
@@ -436,6 +576,10 @@
     requestController = null;
     playbackSource?.stop();
     playbackSource = null;
+    if (recognitionActive) recognition?.abort();
+    recognitionActive = false;
+    window.speechSynthesis?.cancel();
+    speechUtterance = null;
     if (recorder?.state === "recording") recorder.stop();
     recorder = null;
     stream?.getTracks().forEach((track) => track.stop());
@@ -453,9 +597,10 @@
     muteButton.setAttribute("aria-pressed", String(muted));
     muteButton.querySelector("span").textContent = muted ? "Unmute" : "Mute";
     stream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
-    if (muted && recorder?.state === "recording") {
+    if (muted && (recorder?.state === "recording" || recognitionActive)) {
       cancelledTurn = true;
-      recorder.stop();
+      if (recorder?.state === "recording") recorder.stop();
+      if (recognitionActive) recognition?.abort();
       setMode("idle", "Microphone muted.");
     } else if (!muted && !stopped) {
       startListening();
@@ -471,6 +616,7 @@
   document.getElementById("retryVoice").addEventListener("click", startAssistant);
   guardianSelect.addEventListener("change", () => {
     sessionId = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    useGuardianLanguage();
   });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) stopAssistant();
@@ -491,6 +637,7 @@
         option.textContent = `${item.student_name} — ${item.grade || ""} ${item.section || ""}`.trim();
         guardianSelect.appendChild(option);
       });
+      useGuardianLanguage();
       if (!items.length) showError("No linked children are available.");
     })
     .catch((error) => showError(error.message));
