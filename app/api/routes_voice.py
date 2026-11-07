@@ -116,6 +116,7 @@ async def voice_status(request: Request, _tenant: str = Depends(get_current_tena
 )
 async def voice_chat(
     request: Request,
+    response: Response,
     tenant_id: str = Depends(get_current_tenant),
 ):
     request_started = time.perf_counter()
@@ -144,7 +145,7 @@ async def voice_chat(
             max_seconds=settings.voice_max_seconds,
         )
         decoded = time.perf_counter()
-        return await service.chat(
+        result = await service.chat(
             tenant_id=tenant_id,
             guardian=guardian,
             student=student,
@@ -155,8 +156,17 @@ async def voice_chat(
             upload_ms=round((uploaded - request_started) * 1000),
             decode_ms=round((decoded - uploaded) * 1000),
         )
+        timings = result["timings_ms"]
+        response.headers["Server-Timing"] = ", ".join(
+            f"{name};dur={timings[name]}"
+            for name in ("upload", "decode", "queue", "stt", "router", "agent_llm", "tts")
+        )
+        return result
     except (AudioValidationError, VoiceError) as exc:
-        raise HTTPException(exc.status_code, exc.detail) from None
+        headers = None
+        if exc.status_code == 429:
+            headers = {"Retry-After": "2" if "another request" in exc.detail else "60"}
+        raise HTTPException(exc.status_code, exc.detail, headers=headers) from None
 
 
 @router.get("/audio/{audio_id}")

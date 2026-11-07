@@ -13,7 +13,7 @@ from app.voice.stt import SttEngine, Transcript
 from app.voice.storage import AudioStore
 from app.voice.tts import TtsEngine
 
-logger = logging.getLogger(__name__)
+operations_logger = logging.getLogger("uvicorn.error")
 
 
 class VoiceError(Exception):
@@ -67,10 +67,16 @@ class VoiceService:
 
     def check_rate(self, action: str, guardian_id: str) -> None:
         limit = self.guardian_rate if action == "chat" else self.speak_rate
-        if not self._rates.allow(action, guardian_id, limit) or not self._rates.allow(
-            "global", "__global__", self.global_rate
-        ):
-            raise VoiceError(429, "Voice request rate limit exceeded")
+        if not self._rates.allow(action, guardian_id, limit):
+            operations_logger.warning(
+                "voice_rejected reason=guardian_rate action=%s guardian_id=%s",
+                action,
+                guardian_id,
+            )
+            raise VoiceError(429, "Too many voice requests. Please wait up to one minute.")
+        if not self._rates.allow("global", "__global__", self.global_rate):
+            operations_logger.warning("voice_rejected reason=global_rate action=%s", action)
+            raise VoiceError(429, "The voice service request limit was reached. Please wait one minute.")
 
     async def chat(
         self,
@@ -85,15 +91,20 @@ class VoiceService:
         upload_ms: int = 0,
         decode_ms: int = 0,
     ) -> dict:
-        self.check_rate("chat", guardian["id"])
         started = time.perf_counter()
         fallback_language = _voice_language(language, guardian)
         try:
             await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
         except TimeoutError:
-            raise VoiceError(429, "Voice service is busy; please try again") from None
+            operations_logger.warning(
+                "voice_rejected reason=queue_busy guardian_id=%s timeout_seconds=%.2f",
+                guardian["id"],
+                self.queue_timeout,
+            )
+            raise VoiceError(429, "Voice service is processing another request. Please try again.") from None
         queued = time.perf_counter()
         try:
+            self.check_rate("chat", guardian["id"])
             prompt = _initial_prompt(student)
             transcript = await asyncio.to_thread(
                 self.stt.transcribe, audio, content_type, None, prompt
@@ -157,7 +168,7 @@ class VoiceService:
                 "tts": round((finished - replied) * 1000),
             }
             timings_ms["total"] = sum(timings_ms.values())
-            logger.info(
+            operations_logger.info(
                 "voice_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
                 guardian["id"],
                 session_id or "default",

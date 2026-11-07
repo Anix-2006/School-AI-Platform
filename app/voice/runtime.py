@@ -56,7 +56,11 @@ class VoiceRuntime:
                 self.error = str(exc)
 
     def status(self) -> dict:
-        return {"status": self.state}
+        return {
+            "status": self.state,
+            "vad_silence_ms": settings.voice_vad_silence_ms,
+            "idle_prompt_seconds": settings.voice_idle_prompt_seconds,
+        }
 
     def close(self) -> None:
         if self.service is not None:

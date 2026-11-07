@@ -105,8 +105,8 @@
 (() => {
   "use strict";
 
-  const SILENCE_MS = 800;
-  const IDLE_MS = 20000;
+  let silenceMs = 700;
+  let idleMs = 20000;
   const MAX_MS = 30000;
   const stateLabel = document.getElementById("voiceState");
   const hint = document.getElementById("voiceHint");
@@ -131,21 +131,29 @@
   let stream = null;
   let recorder = null;
   let chunks = [];
+  let preSpeechChunks = [];
   let audioContext = null;
   let analyser = null;
   let analyserData = null;
   let meterFrame = 0;
   let playbackSource = null;
   let requestController = null;
+  let requestInFlight = false;
   let heardSpeech = false;
   let speechStartedAt = 0;
+  let speechCandidateAt = 0;
+  let speechDetectedAt = 0;
   let lastLoudAt = 0;
+  let lastPlaybackEndedAt = 0;
   let idleSince = 0;
   let idlePrompted = false;
   let muted = false;
   let stopped = true;
   let cancelledTurn = false;
   let sessionId = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const MIN_SPEECH_MS = 350;
+  const SPEECH_CONFIRM_MS = 180;
+  const PLAYBACK_COOLDOWN_MS = 500;
 
   const labels = {
     en: {
@@ -242,13 +250,19 @@
     stage.style.setProperty("--mouth-scale", String(Math.min(2.6, 0.7 + level * 15)));
     const now = performance.now();
     if (mode === "listening" && !muted) {
-      if (level > 0.035) {
-        heardSpeech = true;
-        lastLoudAt = now;
-      } else if (heardSpeech && now - lastLoudAt >= SILENCE_MS) {
-        finishTurn();
-      } else if (!heardSpeech && Date.now() - idleSince >= IDLE_MS) {
-        handleIdle();
+      const threshold = now - lastPlaybackEndedAt < PLAYBACK_COOLDOWN_MS ? 0.07 : 0.045;
+      if (level > threshold) {
+        speechCandidateAt ||= now;
+        if (now - speechCandidateAt >= SPEECH_CONFIRM_MS) {
+          if (!heardSpeech) speechDetectedAt = now;
+          heardSpeech = true;
+          lastLoudAt = now;
+        }
+      } else if (heardSpeech && now - lastLoudAt >= silenceMs) {
+        if (now - speechDetectedAt >= MIN_SPEECH_MS) finishTurn();
+      } else if (!heardSpeech) {
+        speechCandidateAt = 0;
+        if (Date.now() - idleSince >= idleMs) handleIdle();
       }
     } else if (mode === "speaking" && level > 0.11) {
       if (!speechStartedAt) speechStartedAt = now;
@@ -268,7 +282,13 @@
     try {
       startButton.disabled = true;
       setMode("thinking", "Waking up the server. This can take up to a minute.");
-      await Promise.all([SchoolAPI.health(), SchoolAPI.voiceStatus(), unlockAudio()]);
+      const [, voiceStatus] = await Promise.all([
+        SchoolAPI.health(),
+        SchoolAPI.voiceStatus(),
+        unlockAudio(),
+      ]);
+      silenceMs = Number(voiceStatus?.vad_silence_ms) || silenceMs;
+      idleMs = (Number(voiceStatus?.idle_prompt_seconds) || 20) * 1000;
       await ensureStream();
       stopped = false;
       idlePrompted = false;
@@ -284,19 +304,32 @@
   }
 
   function startListening(resetIdle = true) {
-    if (stopped || muted || recorder?.state === "recording") return;
+    if (stopped || muted || requestInFlight || recorder?.state === "recording") return;
     if (resetIdle) idlePrompted = false;
     heardSpeech = false;
+    speechCandidateAt = 0;
+    speechDetectedAt = 0;
     lastLoudAt = performance.now();
     idleSince = Date.now();
     chunks = [];
+    preSpeechChunks = [];
     cancelledTurn = false;
     const type = mimeType();
     recorder = type
       ? new MediaRecorder(stream, { mimeType: type, audioBitsPerSecond: 24000 })
       : new MediaRecorder(stream);
     recorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size) chunks.push(event.data);
+      if (!event.data.size) return;
+      if (!heardSpeech) {
+        preSpeechChunks.push(event.data);
+        if (preSpeechChunks.length > 3) preSpeechChunks.shift();
+        return;
+      }
+      if (preSpeechChunks.length) {
+        chunks.push(...preSpeechChunks);
+        preSpeechChunks = [];
+      }
+      chunks.push(event.data);
     });
     recorder.addEventListener("stop", processTurn, { once: true });
     recorder.start(200);
@@ -315,6 +348,7 @@
   async function processTurn() {
     const parts = chunks.slice();
     chunks = [];
+    preSpeechChunks = [];
     recorder = null;
     if (cancelledTurn || stopped) return;
     if (!heardSpeech || !parts.length) {
@@ -334,6 +368,7 @@
     form.append("student_id", String(selected.student_id));
     form.append("session_id", sessionId);
     requestController = new AbortController();
+    requestInFlight = true;
     try {
       const data = await SchoolAPI.voiceChat(form, requestController.signal);
       transcriptText.textContent = data.transcript || "—";
@@ -349,6 +384,7 @@
       if (error?.name === "AbortError" || stopped) return;
       showError(error.message || "The voice question could not be processed.");
     } finally {
+      requestInFlight = false;
       requestController = null;
     }
   }
@@ -362,7 +398,11 @@
     playbackSource.connect(audioContext.destination);
     playbackSource.addEventListener("ended", () => {
       playbackSource = null;
-      if (resumeListening && !stopped && mode === "speaking") startListening();
+      lastPlaybackEndedAt = performance.now();
+      if (resumeListening && !stopped && mode === "speaking") {
+        setMode("idle", "Preparing to listen…");
+        window.setTimeout(() => startListening(), PLAYBACK_COOLDOWN_MS);
+      }
     }, { once: true });
     setMode("speaking");
     playbackSource.start();
