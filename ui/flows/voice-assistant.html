@@ -131,7 +131,6 @@
   let stream = null;
   let recorder = null;
   let chunks = [];
-  let preSpeechChunks = [];
   let audioContext = null;
   let analyser = null;
   let analyserData = null;
@@ -312,24 +311,13 @@
     lastLoudAt = performance.now();
     idleSince = Date.now();
     chunks = [];
-    preSpeechChunks = [];
     cancelledTurn = false;
     const type = mimeType();
     recorder = type
       ? new MediaRecorder(stream, { mimeType: type, audioBitsPerSecond: 24000 })
       : new MediaRecorder(stream);
     recorder.addEventListener("dataavailable", (event) => {
-      if (!event.data.size) return;
-      if (!heardSpeech) {
-        preSpeechChunks.push(event.data);
-        if (preSpeechChunks.length > 3) preSpeechChunks.shift();
-        return;
-      }
-      if (preSpeechChunks.length) {
-        chunks.push(...preSpeechChunks);
-        preSpeechChunks = [];
-      }
-      chunks.push(event.data);
+      if (event.data.size) chunks.push(event.data);
     });
     recorder.addEventListener("stop", processTurn, { once: true });
     recorder.start(200);
@@ -348,7 +336,6 @@
   async function processTurn() {
     const parts = chunks.slice();
     chunks = [];
-    preSpeechChunks = [];
     recorder = null;
     if (cancelledTurn || stopped) return;
     if (!heardSpeech || !parts.length) {
