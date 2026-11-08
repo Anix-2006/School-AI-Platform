@@ -145,6 +145,7 @@
     if ([
       "/flows/parent-chat",
       "/flows/voice-assistant",
+      "/flows/voice",
       "/flows/ask-a-helper",
       "/flows/whatsapp",
     ].includes(path)) return "parent";

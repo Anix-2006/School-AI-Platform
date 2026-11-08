@@ -46,6 +46,14 @@ For the Python 3.11 setup, voice configuration, secure-browser requirements,
 manual checks, Render deployment, limits, and unmeasured verification
 templates, see [RUNNING.md](RUNNING.md). Run one uvicorn worker.
 
+The browser voice demo is at http://localhost:8000/flows/voice (set
+`VOICE_ENABLED=true`). Choose a parent, record a question, and the page plays
+the spoken reply. Recording stops just before `VOICE_MAX_SECONDS` (30 seconds
+unless that setting is changed). The spoken reply uses the parent's language
+when it is English, Hindi, or Telugu. Any other language is spoken in English,
+and the response reports English. Microphone access works on `http://localhost`.
+Any other host needs HTTPS.
+
 ## Demo data
 
 Every read and write goes through `get_store()` in
