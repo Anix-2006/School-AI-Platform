@@ -9,7 +9,14 @@ import pytest
 from app.config import Settings, settings
 
 ROOT = Path(__file__).resolve().parent.parent
-WHISPER_ENV = ("WHISPER_MODEL", "WHISPER_DEVICE", "WHISPER_COMPUTE_TYPE", "WHISPER_MODEL_DIR")
+WHISPER_ENV = (
+    "WHISPER_MODEL",
+    "WHISPER_DEVICE",
+    "WHISPER_COMPUTE_TYPE",
+    "WHISPER_MODEL_DIR",
+    "WHISPER_CPU_THREADS",
+    "WHISPER_NUM_WORKERS",
+)
 
 
 def fake_faster_whisper(monkeypatch, error: Exception | None = None):
@@ -38,6 +45,8 @@ def test_whisper_settings_defaults(monkeypatch):
     assert config.whisper_device == "cpu"
     assert config.whisper_compute_type == "int8"
     assert config.whisper_model_dir == "models/whisper"
+    assert config.whisper_cpu_threads == 1
+    assert config.whisper_num_workers == 1
 
 
 def test_whisper_settings_env_overrides(monkeypatch):
@@ -126,8 +135,10 @@ def test_downloader_reports_missing_package(monkeypatch, tmp_path, capsys):
 
 def test_runtime_loads_only_local_files_from_model_dir(monkeypatch, tmp_path):
     from app.voice.runtime import VoiceRuntime
+    from app.voice.stt import reset_stt_for_tests
 
     calls = fake_faster_whisper(monkeypatch)
+    reset_stt_for_tests()
     monkeypatch.setattr(settings, "voice_enabled", True)
     monkeypatch.setattr(settings, "whisper_model", "small")
     monkeypatch.setattr(settings, "whisper_model_dir", str(tmp_path))
@@ -141,18 +152,23 @@ def test_runtime_loads_only_local_files_from_model_dir(monkeypatch, tmp_path):
                 "model": "small",
                 "device": settings.whisper_device,
                 "compute_type": settings.whisper_compute_type,
+                "cpu_threads": settings.whisper_cpu_threads,
+                "num_workers": settings.whisper_num_workers,
                 "download_root": str(tmp_path),
                 "local_files_only": True,
             }
         ]
     finally:
         runtime.close()
+        reset_stt_for_tests()
 
 
 def test_runtime_reports_missing_model_with_download_command(monkeypatch, tmp_path):
     from app.voice.runtime import VoiceRuntime
+    from app.voice.stt import reset_stt_for_tests
 
     fake_faster_whisper(monkeypatch, error=FileNotFoundError("not in cache"))
+    reset_stt_for_tests()
     monkeypatch.setattr(settings, "voice_enabled", True)
     monkeypatch.setattr(settings, "whisper_model_dir", str(tmp_path))
 
@@ -160,7 +176,8 @@ def test_runtime_reports_missing_model_with_download_command(monkeypatch, tmp_pa
     asyncio.run(runtime.warm())
     assert runtime.state == "error"
     assert "python -m app.voice.download_model" in runtime.error
-    assert runtime.status() == {"status": "error"}
+    assert runtime.status()["status"] == "error"
+    reset_stt_for_tests()
 
 
 def read(name: str) -> str:
@@ -176,7 +193,9 @@ def test_setup_files_agree_on_whisper_settings(monkeypatch):
         for line in read(".env.example").splitlines()
         if line.startswith("WHISPER_")
     )
-    assert example == {name: getattr(defaults, name.lower()) for name in WHISPER_ENV}
+    assert example == {
+        name: str(getattr(defaults, name.lower())) for name in WHISPER_ENV
+    }
 
     compose = read("docker-compose.yml")
     assert "\n  api:\n" in compose

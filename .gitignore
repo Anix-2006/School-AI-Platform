@@ -7,3 +7,5 @@ data/exports/
 venv/
 .venv/
 models/whisper/
+
+benchmark_results/

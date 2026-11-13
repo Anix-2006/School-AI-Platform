@@ -4,11 +4,10 @@ import asyncio
 import logging
 
 from app.config import settings
-from app.services.excel_store import resolve_path
 from app.voice.service import VoiceService
-from app.voice.stt import FasterWhisperEngine
+from app.voice.stt import get_stt
 from app.voice.storage import AudioStore
-from app.voice.tts import GttsEngine
+from app.voice.tts import get_tts
 
 logger = logging.getLogger(__name__)
 
@@ -28,20 +27,11 @@ class VoiceRuntime:
                 return
             self.state = "warming"
             try:
-                # Startup only loads a model already fetched by
-                # `python -m app.voice.download_model`; it never downloads.
-                stt = FasterWhisperEngine(
-                    settings.whisper_model,
-                    device=settings.whisper_device,
-                    compute_type=settings.whisper_compute_type,
-                    download_root=str(resolve_path(settings.whisper_model_dir)),
-                    local_files_only=True,
-                )
+                # Load a model already fetched by
+                # `python -m app.voice.download_model`; never download here.
+                stt = get_stt()
                 await asyncio.to_thread(stt.warmup)
-                tts = GttsEngine(
-                    timeout=settings.voice_tts_timeout,
-                    cache_size=settings.tts_cache_size,
-                )
+                tts = get_tts()
                 self.service = VoiceService(
                     stt,
                     tts,
@@ -52,6 +42,7 @@ class VoiceRuntime:
                     global_rate=settings.voice_global_rate,
                     speak_rate=settings.voice_speak_rate,
                     max_seconds=settings.voice_max_seconds,
+                    tts_timeout=settings.voice_tts_timeout,
                 )
                 self.state = "ready"
                 self.error = None
@@ -61,7 +52,12 @@ class VoiceRuntime:
                 self.error = str(exc)
 
     def status(self) -> dict:
-        return {"status": self.state}
+        return {
+            "status": self.state,
+            "vad_silence_ms": settings.voice_vad_silence_ms,
+            "idle_prompt_seconds": settings.voice_idle_prompt_seconds,
+            "max_seconds": settings.voice_max_seconds,
+        }
 
     def close(self) -> None:
         if self.service is not None:

@@ -118,6 +118,8 @@ and set `OPENAI_API_KEY`. The voice settings and their defaults:
 | `WHISPER_DEVICE` | `cpu` | Where speech-to-text runs |
 | `WHISPER_COMPUTE_TYPE` | `int8` | Precision; `int8` is the CPU-friendly choice |
 | `WHISPER_MODEL_DIR` | `models/whisper` | Where the model is stored, relative to the repo root |
+| `WHISPER_CPU_THREADS` | `1` | CPU threads for Whisper (keep low on free-tier hosts) |
+| `WHISPER_NUM_WORKERS` | `1` | Whisper worker processes (keep low on free-tier hosts) |
 
 Download the model once, explicitly:
 

@@ -15,13 +15,13 @@ from app.voice.service import (
     audio_owner_key,
     choose_reply_language,
 )
-from app.voice.stt import FasterWhisperEngine, Transcript, closest_supported_language
+from app.voice.stt import Transcript, WhisperSTT, closest_supported_language
 from app.voice.storage import AudioStore
 
 
 class FakeStt:
     def __init__(self, text="Any homework?", language="hi", delay=0):
-        self.result = Transcript(text, language, 1.0, 1.0)
+        self.result = Transcript(text, language, duration_seconds=1.0, confidence=1.0)
         self.calls = 0
         self.arguments = []
         self.delay = delay
@@ -29,9 +29,9 @@ class FakeStt:
     def load(self):
         return None
 
-    def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+    def transcribe(self, audio_wav, language=None, *, initial_prompt=None):
         self.calls += 1
-        self.arguments.append((content_type, language, initial_prompt))
+        self.arguments.append((language, initial_prompt))
         time.sleep(self.delay)
         return self.result
 
@@ -41,7 +41,7 @@ class FakeTts:
         self.fail = fail
         self.calls = []
 
-    async def synthesize(self, text, language):
+    def speak(self, text, language):
         self.calls.append((text, language))
         if self.fail:
             raise RuntimeError("offline")
@@ -91,7 +91,7 @@ def test_cleaner_makes_school_content_speakable():
     ],
 )
 def test_reply_language_is_chosen_per_turn(text, detected, expected):
-    assert choose_reply_language(Transcript(text, detected, 1, 1)) == expected
+    assert choose_reply_language(Transcript(text, detected, 1.0, confidence=1.0)) == expected
 
 
 def test_audio_validation_is_in_memory_and_bounded():
@@ -102,6 +102,25 @@ def test_audio_validation_is_in_memory_and_bounded():
     with pytest.raises(AudioValidationError) as wrong_type:
         validate_audio(b"not audio", "text/plain", max_bytes=100, max_seconds=1)
     assert wrong_type.value.status_code == 415
+
+
+def test_whisper_uses_single_cpu_thread_and_worker(monkeypatch):
+    created = {}
+
+    class FakeWhisperModel:
+        def __init__(self, model_name, **kwargs):
+            created.update(model_name=model_name, **kwargs)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "faster_whisper",
+        types.SimpleNamespace(WhisperModel=FakeWhisperModel),
+    )
+    engine = WhisperSTT("tiny", cpu_threads=1, num_workers=1)
+    engine.load()
+    assert created["model_name"] == "tiny"
+    assert created["cpu_threads"] == 1
+    assert created["num_workers"] == 1
 
 
 def test_non_wav_duration_uses_in_memory_decoder(monkeypatch):
@@ -144,11 +163,13 @@ def test_audio_store_enforces_owner_expiry_and_one_download():
 def test_silence_and_repetition_are_detected():
     from app.voice.service import _is_unusable_transcript
 
-    assert _is_unusable_transcript(Transcript("", "en", 1, 1))
-    assert _is_unusable_transcript(Transcript("hello there", "en", 0.1, 1))
-    assert _is_unusable_transcript(Transcript("yes yes yes yes yes", "en", 1, 1))
-    assert not _is_unusable_transcript(Transcript("Homework?", "en", 1, 1))
-    assert not _is_unusable_transcript(Transcript("what is the homework today", "en", 1, 1))
+    assert _is_unusable_transcript(Transcript("", "en", 1.0, confidence=1.0))
+    assert _is_unusable_transcript(Transcript("hello there", "en", 1.0, confidence=0.1))
+    assert _is_unusable_transcript(Transcript("yes yes yes yes yes", "en", 1.0, confidence=1.0))
+    assert not _is_unusable_transcript(Transcript("Homework?", "en", 1.0, confidence=1.0))
+    assert not _is_unusable_transcript(
+        Transcript("what is the homework today", "en", 1.0, confidence=1.0)
+    )
 
 
 class FakeWhisperModel:
@@ -159,10 +180,10 @@ class FakeWhisperModel:
 
     def transcribe(self, audio, **kwargs):
         self.calls.append(kwargs)
-        language = kwargs["language"] or self.detected
+        language = kwargs.get("language") or self.detected
         info = types.SimpleNamespace(
             language=language,
-            all_language_probs=None if kwargs["language"] else self.probs,
+            all_language_probs=None if kwargs.get("language") else self.probs,
             duration=1.0,
         )
         segment = types.SimpleNamespace(text=f" text-{language}", no_speech_prob=0.1)
@@ -170,14 +191,14 @@ class FakeWhisperModel:
 
 
 def engine_with(model):
-    engine = FasterWhisperEngine("small")
+    engine = WhisperSTT("small")
     engine._model = model
     return engine
 
 
 def test_stt_retries_repetitive_decodes_at_higher_temperatures():
     model = FakeWhisperModel("en", [("en", 0.9)])
-    transcript = engine_with(model).transcribe(b"audio", "audio/webm")
+    transcript = engine_with(model).transcribe(b"audio")
     assert transcript.text == "text-en"
     assert len(model.calls) == 1
     assert model.calls[0]["temperature"] == (0.0, 0.2, 0.4)
@@ -186,8 +207,8 @@ def test_stt_retries_repetitive_decodes_at_higher_temperatures():
 
 def test_stt_maps_urdu_detection_to_hindi():
     model = FakeWhisperModel("ur", [("ur", 0.5), ("hi", 0.3), ("en", 0.1)])
-    transcript = engine_with(model).transcribe(b"audio", "audio/webm", initial_prompt="p")
-    assert [call["language"] for call in model.calls] == [None, "hi"]
+    transcript = engine_with(model).transcribe(b"audio", initial_prompt="p")
+    assert [call.get("language") for call in model.calls] == [None, "hi"]
     assert model.calls[1]["initial_prompt"] == "p"
     assert transcript.language == "hi"
     assert transcript.text == "text-hi"
@@ -195,8 +216,8 @@ def test_stt_maps_urdu_detection_to_hindi():
 
 def test_stt_explicit_language_is_not_redetected():
     model = FakeWhisperModel("ur")
-    transcript = engine_with(model).transcribe(b"audio", "audio/webm", language="en")
-    assert [call["language"] for call in model.calls] == ["en"]
+    transcript = engine_with(model).transcribe(b"audio", language="en")
+    assert [call.get("language") for call in model.calls] == ["en"]
     assert transcript.language == "en"
 
 
@@ -238,7 +259,7 @@ def test_tts_failure_degrades_to_text(monkeypatch):
     assert result["reply"] == "**Answer**"
     assert result["tts_degraded"] is True
     assert result["audio_id"] is None
-    assert stt.arguments[0][1] is None
+    assert stt.arguments[0][0] == "en"
     assert result["language"] == "en"
 
 
@@ -273,25 +294,25 @@ def test_silence_returns_localized_reply_without_llm(monkeypatch):
     assert tts.calls
 
 
-def test_pipeline_passes_content_type_student_prompt_and_timings(monkeypatch):
+def test_pipeline_passes_language_student_prompt_and_timings(monkeypatch):
     from app.voice import service as module
 
     calls = []
     stt = FakeStt()
     original_transcribe = stt.transcribe
 
-    def transcribe(*args):
+    def transcribe(*args, **kwargs):
         calls.append("stt")
-        return original_transcribe(*args)
+        return original_transcribe(*args, **kwargs)
 
     def llm(*_args):
         calls.append("llm")
         return {"reply": "Answer", "student_id": "s-1", "language": "hi"}
 
     class OrderedTts(FakeTts):
-        async def synthesize(self, text, language):
+        def speak(self, text, language):
             calls.append("tts")
-            return await super().synthesize(text, language)
+            return super().speak(text, language)
 
     stt.transcribe = transcribe
     monkeypatch.setattr(module, "run_parent_turn", llm)
@@ -308,8 +329,8 @@ def test_pipeline_passes_content_type_student_prompt_and_timings(monkeypatch):
         )
     )
     assert calls == ["stt", "llm", "tts"]
-    assert stt.arguments[0][0:2] == ("audio/ogg", None)
-    assert "Ananya" in stt.arguments[0][2]
+    assert stt.arguments[0][0] == "hi"
+    assert "Ananya" in (stt.arguments[0][1] or "")
     assert all(key in result["timings"] for key in ("stt", "llm", "tts", "total"))
 
 
@@ -339,6 +360,7 @@ def test_short_queue_rejects_excess_concurrency(monkeypatch):
         with pytest.raises(VoiceError) as busy:
             await service.chat(**kwargs)
         assert busy.value.status_code == 429
+        assert "processing another request" in busy.value.detail
         await first
 
     asyncio.run(run())
@@ -352,6 +374,7 @@ def test_global_and_guardian_rates_return_429():
     with pytest.raises(VoiceError) as guardian_limit:
         service.check_rate("chat", "g-1")
     assert guardian_limit.value.status_code == 429
+    assert "wait up to one minute" in guardian_limit.value.detail
     service.check_rate("chat", "g-2")
     with pytest.raises(VoiceError) as global_limit:
         service.check_rate("chat", "g-3")
@@ -384,6 +407,7 @@ def test_voice_api_auth_access_history_response_and_download(
     )
     assert response.status_code == 200
     body = response.json()
+    assert "stt;dur=" in response.headers["server-timing"]
     assert set(body) == {
         "transcript",
         "reply",
@@ -412,6 +436,66 @@ def test_voice_api_auth_access_history_response_and_download(
     assert client.get(f"/voice/audio/{audio_id}", params={"guardian_id": "g-7-1"}).status_code == 403
     assert client.get(f"/voice/audio/{audio_id}", params={"guardian_id": "g-3-1"}).content == b"ID3speech"
     assert client.get(f"/voice/audio/{audio_id}", params={"guardian_id": "g-3-1"}).status_code == 404
+
+
+def test_voice_text_chat_skips_server_stt_and_tts(client, monkeypatch):
+    from app.main import app
+    from app.services import chat_service
+    from tests.fakes import FakeGraph
+
+    graph = FakeGraph()
+    monkeypatch.setattr(chat_service, "orchestrator_graph", graph)
+    stt = FakeStt()
+    tts = FakeTts()
+    app.state.voice_runtime = FakeRuntime(VoiceService(stt, tts, AudioStore()))
+
+    response = client.post(
+        "/voice/text-chat",
+        json={
+            "guardian_id": "g-3-1",
+            "student_id": "s-3-1",
+            "transcript": "आज का होमवर्क क्या है?",
+            "language": "en",
+            "session_id": "browser-voice",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["language"] == "hi"
+    assert response.json()["audio_id"] is None
+    assert "router;dur=" in response.headers["server-timing"]
+    assert stt.calls == 0
+    assert tts.calls == []
+    assert graph.calls[0]["state"]["channel"] == "voice"
+    assert graph.calls[0]["state"]["reply_language"] == "hi"
+
+
+@pytest.mark.parametrize(
+    ("guardian_id", "student_id", "status"),
+    [
+        ("g-nobody", "s-3-1", 404),
+        ("g-7-1", "s-7-1", 403),
+        ("g-3-1", "s-5-1", 403),
+    ],
+)
+def test_voice_text_chat_keeps_parent_access_checks(
+    client, guardian_id, student_id, status
+):
+    from app.main import app
+
+    app.state.voice_runtime = FakeRuntime(
+        VoiceService(FakeStt(), FakeTts(), AudioStore())
+    )
+    response = client.post(
+        "/voice/text-chat",
+        json={
+            "guardian_id": guardian_id,
+            "student_id": student_id,
+            "transcript": "Any homework?",
+            "language": "en",
+        },
+    )
+    assert response.status_code == status
 
 
 def test_access_is_resolved_before_stt(client):
@@ -585,6 +669,12 @@ def test_hands_free_voice_page_and_mascot_assets_are_served(client):
     assert page.status_code == 200
     assert "Start voice assistant" in page.text
     assert "vaani-mascot" in page.text
+    assert "requestInFlight" in page.text
+    assert "if (event.data.size) chunks.push(event.data);" in page.text
+    assert "preSpeechChunks" not in page.text
+    assert "beginRecording();" in page.text
+    assert "let maxMs = 10000;" in page.text
+    assert "PLAYBACK_COOLDOWN_MS" in page.text
     assert "onclick=" not in page.text
     for size in (32, 512):
         image = client.get(f"/voice-mascot-{size}.png")

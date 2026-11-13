@@ -37,8 +37,10 @@ voice model, limits, and audio cache in one process. Close
 - `WHISPER_MODEL_DIR=models/whisper`: where
   `python -m app.voice.download_model` stores the model and where the app
   loads it from (see **Voice setup** in [README.md](README.md)).
+- `WHISPER_CPU_THREADS=1` and `WHISPER_NUM_WORKERS=1`: avoid CPU
+  oversubscription on a single-core/free-tier instance.
 - `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
-- `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
+- `VOICE_MAX_SECONDS=10` and `VOICE_MAX_BYTES=5242880`: upload limits.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
 - `VOICE_QUEUE_TIMEOUT=2.0`: seconds to wait for a voice job slot.
 - `VOICE_GUARDIAN_RATE=10`: voice-chat requests per guardian per 60 seconds.
@@ -48,7 +50,7 @@ voice model, limits, and audio cache in one process. Close
   60 seconds.
 - `VOICE_TTS_TIMEOUT=4.0`: seconds per gTTS attempt; one retry is made.
 - `VOICE_AUDIO_TTL=300.0`: generated chat audio lifetime in process memory.
-- `VOICE_VAD_SILENCE_MS=800`: browser silence interval that ends a turn.
+- `VOICE_VAD_SILENCE_MS=700`: browser silence interval that ends a turn.
 - `VOICE_IDLE_PROMPT_SECONDS=20`: silence before Vaani asks if the parent is
   still present.
 
