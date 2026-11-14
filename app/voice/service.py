@@ -198,6 +198,70 @@ class VoiceService:
         finally:
             self._slots.release()
 
+    async def reply_text(
+        self,
+        *,
+        tenant_id: str,
+        guardian: dict,
+        student: dict,
+        audio: bytes,
+        content_type: str,
+        channel: str,
+        thread_id: str,
+    ) -> dict:
+        """Transcribe one recorded message and answer it as text (no speech
+        synthesis), on the caller's channel and conversation thread."""
+        del content_type  # callers convert to WAV before invoke; kept for API clarity
+        try:
+            await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
+        except TimeoutError:
+            operations_logger.warning(
+                "voice_rejected reason=queue_busy guardian_id=%s timeout_seconds=%.2f",
+                guardian["id"],
+                self.queue_timeout,
+            )
+            raise VoiceError(
+                429, "Voice service is processing another request. Please try again."
+            ) from None
+        try:
+            self.check_rate("chat", guardian["id"])
+            prompt = _initial_prompt(student)
+            stt_language = _stt_language(None, guardian)
+            transcript = await asyncio.to_thread(
+                self._transcribe, audio, stt_language, prompt
+            )
+            reply_language = choose_reply_language(transcript)
+            if (
+                transcript.duration_seconds is not None
+                and transcript.duration_seconds > self.max_seconds
+            ):
+                raise VoiceError(413, f"Audio exceeds the {self.max_seconds:g} second limit")
+            if _is_unusable_transcript(transcript):
+                language = (
+                    reply_language
+                    if transcript.text.strip()
+                    else _voice_language(None, guardian)
+                )
+                return {
+                    "reply": _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"]),
+                    "transcript": transcript.text,
+                    "agent_used": None,
+                    "language": language,
+                }
+            result = await asyncio.to_thread(
+                run_parent_turn,
+                tenant_id,
+                guardian,
+                student,
+                transcript.text,
+                channel,
+                thread_id,
+                reply_language,
+            )
+            return {**result, "language": reply_language, "transcript": transcript.text}
+        finally:
+            self._slots.release()
+
     async def text_chat(
         self,
         *,

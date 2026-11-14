@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 import io
+import shutil
+import subprocess
 import wave
+
+WHISPER_SAMPLE_RATE = 16_000
+FFMPEG_TIMEOUT_SECONDS = 30.0
+# Duration is measured on a cheap low-rate decode; only the length matters.
+_DURATION_SAMPLE_RATE = 8_000
 
 
 class AudioValidationError(ValueError):
@@ -9,6 +16,61 @@ class AudioValidationError(ValueError):
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
+
+
+class InvalidAudioError(ValueError):
+    """The bytes are empty or ffmpeg cannot decode them as audio."""
+
+
+class AudioToolError(RuntimeError):
+    """ffmpeg is missing or did not finish in time; not the sender's fault."""
+
+
+def to_whisper_wav(data: bytes, *, max_seconds: float | None = None) -> bytes:
+    """Decode any ffmpeg-readable audio (e.g. WhatsApp OGG/Opus) to 16 kHz mono
+    16-bit PCM WAV. ``max_seconds`` caps how much audio is decoded."""
+    pcm = _decode_pcm(data, WHISPER_SAMPLE_RATE, max_seconds)
+    target = io.BytesIO()
+    with wave.open(target, "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(WHISPER_SAMPLE_RATE)
+        output.writeframes(pcm)
+    return target.getvalue()
+
+
+def audio_duration(data: bytes, *, limit: float | None = None) -> float:
+    """Seconds of audio ffmpeg actually decodes (container metadata is not
+    trusted). With ``limit``, decoding stops just past it, so anything longer
+    reports a value above ``limit`` without decoding the whole file."""
+    cap = limit + 1 if limit is not None else None
+    pcm = _decode_pcm(data, _DURATION_SAMPLE_RATE, cap)
+    return len(pcm) / (_DURATION_SAMPLE_RATE * 2)
+
+
+def _decode_pcm(data: bytes, sample_rate: int, max_seconds: float | None) -> bytes:
+    if not data:
+        raise InvalidAudioError("Audio is empty")
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise AudioToolError("ffmpeg is not installed or not on PATH")
+    command = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-vn"]
+    if max_seconds is not None:
+        command += ["-t", f"{max_seconds:g}"]
+    command += ["-ac", "1", "-ar", str(sample_rate), "-f", "s16le", "-acodec", "pcm_s16le", "pipe:1"]
+    try:
+        result = subprocess.run(
+            command, input=data, capture_output=True, timeout=FFMPEG_TIMEOUT_SECONDS, check=False
+        )
+    except subprocess.TimeoutExpired:
+        raise AudioToolError("ffmpeg timed out while decoding audio") from None
+    except OSError as exc:
+        raise AudioToolError(f"ffmpeg could not be started: {exc.strerror or exc}") from None
+    if result.returncode != 0:
+        raise InvalidAudioError("ffmpeg could not decode the audio")
+    if not result.stdout:
+        raise InvalidAudioError("Audio contains no decodable sound")
+    return result.stdout
 
 
 SUPPORTED_TYPES = {

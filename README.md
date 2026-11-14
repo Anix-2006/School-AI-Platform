@@ -14,7 +14,9 @@ See `app/agents/orchestrator.py` for the graph definition.
 
 Voice adds in-memory audio validation, faster-whisper speech-to-text, the same
 chat access checks/orchestrator/history, and gTTS speech output. It is disabled
-by default.
+by default. When enabled, WhatsApp voice notes from consenting guardians are
+transcribed and answered as text; this needs FFmpeg on `PATH` and
+`WHATSAPP_TOKEN` (see [RUNNING.md](RUNNING.md#whatsapp-voice-notes)).
 
 ## Structure
 
