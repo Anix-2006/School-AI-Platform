@@ -84,7 +84,7 @@ def test_five_requests_run_fifo_without_overlapping_stt(monkeypatch):
     started = 0
 
     class TrackingStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             nonlocal active, max_active, started
             self.calls += 1
             label = audio.decode()
@@ -140,7 +140,7 @@ def test_higher_parallel_limit_allows_overlap(monkeypatch):
     entered_event = asyncio.Event()
 
     class BarrierStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             nonlocal active, max_active, entered
             self.calls += 1
             active += 1
@@ -181,7 +181,7 @@ def test_notify_exactly_once_at_threshold(monkeypatch):
     first_entered = threading.Event()
 
     class HoldStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             self.calls += 1
             first_entered.set()
             stt_hold.wait(timeout=2)
@@ -229,7 +229,7 @@ def test_notify_boundary_and_below_threshold(monkeypatch):
     entered = threading.Event()
 
     class HoldStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             self.calls += 1
             entered.set()
             hold.wait(timeout=2)
@@ -270,7 +270,7 @@ def test_full_queue_returns_localized_busy_without_transcribing(monkeypatch):
     entered = threading.Event()
 
     class HoldStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             self.calls += 1
             entered.set()
             hold.wait(timeout=2)
@@ -342,7 +342,7 @@ def test_transcription_exception_releases_capacity(monkeypatch):
     calls = 0
 
     class FlakyStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             nonlocal calls
             calls += 1
             if calls == 1:
@@ -368,7 +368,7 @@ def test_cancellation_does_not_leak_capacity(monkeypatch):
     entered = threading.Event()
 
     class HoldStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             self.calls += 1
             entered.set()
             hold.wait(timeout=2)
@@ -406,7 +406,7 @@ def test_notify_failure_does_not_duplicate_or_drop_transcription(monkeypatch):
     stt = FakeStt()
 
     class HoldStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             self.calls += 1
             stt.calls += 1
             entered.set()
@@ -504,7 +504,7 @@ def test_short_queue_rejects_excess_waiting(monkeypatch):
     entered = threading.Event()
 
     class HoldStt(FakeStt):
-        def transcribe(self, audio, content_type, language=None, initial_prompt=None):
+        def transcribe(self, audio, language=None, *, initial_prompt=None):
             self.calls += 1
             entered.set()
             hold.wait(timeout=2)
