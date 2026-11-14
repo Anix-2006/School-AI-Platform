@@ -43,8 +43,11 @@ docker compose up --build
 API docs at http://localhost:8000/docs once running.
 
 For the Python 3.11 setup, voice configuration, secure-browser requirements,
-manual checks, Render deployment, limits, and unmeasured verification
-templates, see [RUNNING.md](RUNNING.md). Run one uvicorn worker.
+manual checks, Render deployment, limits, unmeasured verification templates,
+and the concurrent voice load tester (`python -m app.voice.loadtest`), see
+[RUNNING.md](RUNNING.md). Decision template:
+[docs/voice-load-test-report.md](docs/voice-load-test-report.md). Run one
+uvicorn worker.
 
 ## Demo data
 
