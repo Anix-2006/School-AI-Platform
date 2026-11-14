@@ -5,3 +5,7 @@ __pycache__
 ~$*.xlsx
 data/exports/
 venv/
+.venv/
+models/
+.pytest_cache/
+.ruff_cache/
