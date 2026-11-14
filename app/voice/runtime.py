@@ -27,8 +27,9 @@ class VoiceRuntime:
                 return
             self.state = "warming"
             try:
+                # Load a model already fetched by
+                # `python -m app.voice.download_model`; never download here.
                 stt = get_stt()
-                # Load the Whisper model at app startup, not on the first voice request.
                 await asyncio.to_thread(stt.warmup)
                 tts = get_tts()
                 self.service = VoiceService(

@@ -1,5 +1,6 @@
 from pathlib import Path
 import asyncio
+import shutil
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException
@@ -129,4 +130,5 @@ def demo_token():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    # Reported only; voice decodes audio through PyAV, so this does not change status.
+    return {"status": "ok", "ffmpeg": shutil.which("ffmpeg") is not None}
