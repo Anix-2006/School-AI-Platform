@@ -205,7 +205,13 @@
 .voice-captions p { margin: 4px 0 0; overflow-wrap: anywhere; }
 .voice-privacy-copy { margin: 0; color: var(--muted); text-align: center; font-size: 0.8rem; }
 .sidebar-voice-link { display: flex !important; align-items: center; gap: 8px; }
-.voice-nav-icon { width: 25px; height: 25px; flex: 0 0 auto; }
+.voice-nav-icon {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 50%;
+}
 
 .mobile-bottom-nav {
   position: fixed;
@@ -245,6 +251,8 @@
   height: 42px;
   margin-top: -22px;
   overflow: visible;
+  object-fit: cover;
+  border-radius: 50%;
   filter: drop-shadow(0 5px 8px rgba(23, 51, 46, 0.2));
   stroke: none;
 }
@@ -264,7 +272,7 @@
   box-shadow: var(--shadow-md);
 }
 .floating-voice-launch:hover { transform: translateY(-2px); }
-.floating-voice-icon { width: 50px; height: 50px; }
+.floating-voice-icon { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; }
 .parent-chat-card .voice-button,
 .parent-chat-card .voice-recorder,
 .parent-chat-card .voice-privacy { display: none !important; }
@@ -4207,6 +4215,10 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   overflow: visible;
   filter: drop-shadow(0 24px 35px rgba(0, 8, 28, 0.34));
 }
+.entry-vaani.shizuka-photo {
+  max-height: 250px;
+  object-fit: contain;
+}
 .entry-vaani-float { transform-origin: center; animation: vaani-float 4s ease-in-out infinite; }
 .entry-vaani-body { fill: #0b4a9e; stroke: var(--accent-2); stroke-width: 5; }
 .entry-vaani-face { fill: #dff8ff; }
@@ -4223,7 +4235,6 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
 .entry-vaani-eyes ellipse { fill: #fff; stroke: #061a3a; stroke-width: 4; }
 .entry-vaani-eyes circle { fill: #061a3a; }
 .entry-vaani-pocket { fill: rgba(45, 212, 255, 0.24); stroke: var(--accent-2); }
-
 .role-grid { gap: 14px; margin: 0; }
 .role-card {
   min-width: 0;
@@ -4445,7 +4456,7 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   .chat-intro { padding: 15px 16px; }
 }
 
-/* Next UI — Vaani voice assistant */
+/* Next UI — Shizuka voice assistant */
 .voice-mode-page {
   width: min(100%, 50rem);
   padding: 18px 14px calc(112px + env(safe-area-inset-bottom));
@@ -4512,6 +4523,71 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   max-height: 230px;
   filter: drop-shadow(0 20px 30px rgba(0, 8, 28, 0.38));
 }
+.shizuka-avatar {
+  position: relative;
+  width: min(230px, 72vw);
+  height: 230px;
+  animation: shizuka-breathe 3.2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+.vaani-mascot.shizuka-photo {
+  display: block;
+  width: 100%;
+  height: 230px;
+  object-fit: contain;
+  transition: transform 180ms ease-out, filter 180ms ease-out;
+}
+.shizuka-mouth-motion {
+  position: absolute;
+  top: 29.5%;
+  left: 46%;
+  z-index: 2;
+  width: 14px;
+  height: 5px;
+  opacity: 0;
+  background: #8f1f35;
+  border: 1px solid #321018;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scaleY(0.7);
+  transform-origin: center;
+}
+.shizuka-ear-signal {
+  position: absolute;
+  top: 21%;
+  left: 62%;
+  z-index: 2;
+  width: 17px;
+  height: 25px;
+  opacity: 0;
+  border: 3px solid var(--accent-2);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(8deg) scale(0.7);
+}
+.shizuka-ear-signal::after {
+  position: absolute;
+  inset: -9px;
+  content: "";
+  border: 2px solid var(--accent-2);
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-radius: 50%;
+}
+.shizuka-thinking-dots {
+  position: absolute;
+  top: 8%;
+  right: 17%;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+.shizuka-thinking-dots i {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+}
 .vaani-body { fill: #0b4a9e; stroke: var(--accent-2); stroke-width: 5; }
 .vaani-face { fill: #dff8ff; }
 .vaani-eyes ellipse { fill: #fff; stroke: #061a3a; }
@@ -4553,6 +4629,39 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
 .vaani-ring circle { stroke: var(--accent-2); }
 .vaani-dots circle { fill: var(--accent); }
 .vaani-name { color: var(--accent-2); font-family: inherit; }
+.voice-stage[data-state="listening"] .shizuka-avatar {
+  transform: scale(1.04);
+}
+.voice-stage[data-state="listening"] .shizuka-photo {
+  filter: drop-shadow(0 0 22px rgba(45, 212, 255, 0.5));
+}
+.voice-stage[data-state="listening"] .shizuka-ear-signal {
+  opacity: 1;
+  animation: shizuka-hear 900ms ease-out infinite;
+}
+.voice-stage[data-state="thinking"] .shizuka-avatar { animation: vaani-look 1.2s ease-in-out infinite alternate; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots { opacity: 1; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots i { animation: vaani-dot 700ms ease-in-out infinite alternate; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots i:nth-child(2) { animation-delay: 120ms; }
+.voice-stage[data-state="thinking"] .shizuka-thinking-dots i:nth-child(3) { animation-delay: 240ms; }
+.voice-stage[data-state="speaking"] .shizuka-avatar { animation: shizuka-speak 500ms ease-in-out infinite alternate; }
+.voice-stage[data-state="speaking"] .shizuka-mouth-motion {
+  opacity: 1;
+  transform: translate(-50%, -50%) scaleY(var(--mouth-scale, 1));
+  transition: transform 80ms linear;
+}
+.voice-stage[data-state="error"] .shizuka-avatar { transform: rotate(-5deg); animation: none; }
+@keyframes shizuka-breathe {
+  50% { transform: translateY(-4px); }
+}
+@keyframes shizuka-hear {
+  0% { opacity: 0; transform: rotate(8deg) scale(0.55); }
+  45% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(8deg) scale(1.2); }
+}
+@keyframes shizuka-speak {
+  to { transform: scale(1.035); }
+}
 .voice-stage[data-state="waving"] .vaani-arm-right {
   transform-box: fill-box;
   transform-origin: left bottom;

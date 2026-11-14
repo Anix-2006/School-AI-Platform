@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     whisper_model: str = "tiny"
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
+    whisper_cpu_threads: int = 1
+    whisper_num_workers: int = 1
     voice_max_concurrency: int = 1
     # Limits for in-app voice uploads and WhatsApp voice notes.
     voice_max_seconds: float = Field(60, gt=0)
@@ -42,7 +44,7 @@ class Settings(BaseSettings):
     voice_speak_rate: int = 20
     voice_tts_timeout: float = 4.0
     voice_audio_ttl: float = 300.0
-    voice_vad_silence_ms: int = 800
+    voice_vad_silence_ms: int = 700
     voice_idle_prompt_seconds: int = 20
 
 

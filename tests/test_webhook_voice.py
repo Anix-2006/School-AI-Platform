@@ -13,6 +13,7 @@ from app.config import settings
 from app.services import chat_service
 from app.services.whatsapp_service import WhatsAppMedia, WhatsAppMediaError
 from app.voice.audio import AudioToolError, InvalidAudioError
+from app.voice.constants import COULD_NOT_HEAR
 from app.voice.service import VoiceService
 from app.voice.storage import AudioStore
 from app.voice.stt import Transcript
@@ -28,21 +29,23 @@ needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg
 class RecordingStt:
     def __init__(self):
         self.calls = []
-        self.result = Transcript("Was my son present today?", "en", 1.0, None)
+        self.result = Transcript(
+            "Was my son present today?", "en", duration_seconds=None, confidence=1.0
+        )
         self.error = None
 
     def load(self):
         return None
 
-    def transcribe(self, audio, content_type, language=None, initial_prompt=None):
-        self.calls.append((audio, content_type))
+    def transcribe(self, audio, language=None, *, initial_prompt=None):
+        self.calls.append((audio, language, initial_prompt))
         if self.error:
             raise self.error
         return self.result
 
 
 class NoTts:
-    async def synthesize(self, text, language):
+    def speak(self, text, language):
         raise AssertionError("WhatsApp voice notes are answered as text")
 
 
@@ -158,8 +161,9 @@ def test_voice_note_is_converted_transcribed_and_answered(client, store, graph, 
 
     assert res.json()["status"] == "ok"
     assert downloads.calls == [("111", settings.voice_max_bytes)]
-    wav, content_type = stt.calls[0]
-    assert content_type == "audio/wav"
+    wav, language, prompt = stt.calls[0]
+    assert language is None or language in {"en", "hi", "te"}
+    assert isinstance(prompt, str) and "Student" in prompt
     with wave.open(io.BytesIO(wav), "rb") as source:
         assert (source.getframerate(), source.getnchannels(), source.getsampwidth()) == (16_000, 1, 2)
     assert graph.calls[0]["state"]["messages"][0].content == "Was my son present today?"
@@ -349,14 +353,16 @@ def test_transcription_failure_gives_unavailable_reply(client, store, graph, sen
 
 
 def test_empty_transcript_asks_to_repeat_without_agent(client, store, graph, sent, stt, downloads, audio_tools):
-    stt.result = Transcript("", None, 0.0, None)
+    stt.result = Transcript("", None, duration_seconds=None, confidence=0.0)
     res = client.post("/webhooks/whatsapp", json=audio_payload(SURESH, store))
     assert res.json()["status"] == "ok"
-    assert sent == [(SURESH, "I could not hear a clear question. Please try again.")]
+    assert sent == [(SURESH, COULD_NOT_HEAR["en"])]
     assert graph.calls == []
 
 
 def test_hindi_voice_note_gets_hindi_reply_language(client, store, graph, sent, stt, downloads, audio_tools):
-    stt.result = Transcript("क्या मेरा बेटा आज स्कूल आया?", "hi", 1.0, None)
+    stt.result = Transcript(
+        "क्या मेरा बेटा आज स्कूल आया?", "hi", duration_seconds=None, confidence=1.0
+    )
     client.post("/webhooks/whatsapp", json=audio_payload(SURESH, store))
     assert graph.calls[0]["state"]["language"] == "hi"

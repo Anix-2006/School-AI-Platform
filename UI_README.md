@@ -72,12 +72,12 @@ automatically, and listening resumes. It supports English and Hindi per turn.
 - States: idle, waving, listening, thinking, speaking, stopped, and error.
 - Controls: mute, stop/restart, captions, child switcher, and detected-language
   chip.
-- Speaking while playback is active stops Vaani and starts a new turn.
+- Speaking while playback is active stops Shizuka and starts a new turn.
 - Twenty seconds of silence plays one idle prompt; another twenty seconds
   releases the microphone.
 - Mobile uses a four-item bottom bar. At `1024px`, Voice appears in the fixed
   sidebar and the assistant stays centred at a maximum width of `48rem`.
-- Vaani is an original inline-SVG mascot with reduced-motion-safe state
+- Shizuka is an original inline-SVG mascot with reduced-motion-safe state
   animation. Separate SVG groups animate its eyes, mouth, antenna, arms, and
   body. Exported 32px and 512px PNGs are in `ui/assets/`.
 

@@ -34,6 +34,8 @@ voice model, limits, and audio cache in one process. Close
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
 - `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
+- `WHISPER_CPU_THREADS=1` and `WHISPER_NUM_WORKERS=1`: avoid CPU
+  oversubscription on a single-core/free-tier instance.
 - `VOICE_MAX_CONCURRENCY=1`: simultaneous speech-to-text/chat voice jobs.
 - `VOICE_MAX_SECONDS=60` and `VOICE_MAX_BYTES=5242880`: duration and size
   limits for in-app voice uploads and WhatsApp voice notes. Both must be
@@ -47,7 +49,7 @@ voice model, limits, and audio cache in one process. Close
   60 seconds.
 - `VOICE_TTS_TIMEOUT=4.0`: seconds per gTTS attempt; one retry is made.
 - `VOICE_AUDIO_TTL=300.0`: generated chat audio lifetime in process memory.
-- `VOICE_VAD_SILENCE_MS=800`: browser silence interval that ends a turn.
+- `VOICE_VAD_SILENCE_MS=700`: browser silence interval that ends a turn.
 - `VOICE_IDLE_PROMPT_SECONDS=20`: silence before Vaani asks if the parent is
   still present.
 
