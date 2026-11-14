@@ -9,10 +9,10 @@
 - Added keyword routing for obvious English/Hindi school questions.
 - Voice accepts only English and Hindi. The detected audio language and
   Devanagari text decide the reply language on every turn.
-- Added hands-free Vaani mode with browser silence detection, one-tap audio
+- Added hands-free Shizuka mode with browser silence detection, one-tap audio
   unlock, automatic playback, resumed listening, barge-in, idle timeout,
   captions, mute, and stop controls.
-- Added an original inline-SVG Vaani mascot, mobile bottom navigation,
+- Added an original inline-SVG Shizuka mascot, mobile bottom navigation,
   desktop sidebar entry, chat launcher, favicon, and sharing PNG.
 
 ## Measurements

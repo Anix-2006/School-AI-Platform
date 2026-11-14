@@ -34,6 +34,8 @@ voice model, limits, and audio cache in one process. Close
 - `VOICE_ENABLED=false`: voice routes return 404 until explicitly enabled.
 - `WHISPER_MODEL=tiny`, `WHISPER_COMPUTE_TYPE=int8`, and
   `WHISPER_DEVICE=cpu`: speech-to-text model and execution settings.
+- `WHISPER_CPU_THREADS=1` and `WHISPER_NUM_WORKERS=1`: avoid CPU
+  oversubscription on a single-core/free-tier instance.
 - `VOICE_MAX_PARALLEL=1`: maximum simultaneous Whisper transcriptions (CPU
   default). `VOICE_MAX_CONCURRENCY` is a legacy alias used only when
   `VOICE_MAX_PARALLEL` is unset.
@@ -43,7 +45,7 @@ voice model, limits, and audio cache in one process. Close
 - `VOICE_QUEUE_NOTIFY_AT=2`: after a job is admitted, if the waiting count
   (waiting only) is at least this value, send one short localized
   "processing" status. Active transcriptions are not counted.
-- `VOICE_MAX_SECONDS=30` and `VOICE_MAX_BYTES=5242880`: upload limits.
+- `VOICE_MAX_SECONDS=10` and `VOICE_MAX_BYTES=5242880`: upload limits.
 - `TTS_CACHE_SIZE=128`: process-local synthesized-audio LRU entries.
 - `VOICE_QUEUE_TIMEOUT=2.0`: legacy; admission uses `VOICE_QUEUE_MAX` instead.
 - `VOICE_GUARDIAN_RATE=10`: voice-chat requests per guardian per 60 seconds.
@@ -53,7 +55,7 @@ voice model, limits, and audio cache in one process. Close
   60 seconds.
 - `VOICE_TTS_TIMEOUT=4.0`: seconds per gTTS attempt; one retry is made.
 - `VOICE_AUDIO_TTL=300.0`: generated chat audio lifetime in process memory.
-- `VOICE_VAD_SILENCE_MS=800`: browser silence interval that ends a turn.
+- `VOICE_VAD_SILENCE_MS=700`: browser silence interval that ends a turn.
 - `VOICE_IDLE_PROMPT_SECONDS=20`: silence before Vaani asks if the parent is
   still present.
 

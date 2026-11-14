@@ -3,24 +3,12 @@
 
   const SVG_NS = "http://www.w3.org/2000/svg";
   function voiceIcon(className = "voice-nav-icon") {
-    const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("class", className);
-    svg.setAttribute("viewBox", "0 0 48 48");
-    svg.setAttribute("aria-hidden", "true");
-    const body = document.createElementNS(SVG_NS, "path");
-    body.setAttribute("d", "M9 21C9 10 16 4 24 4s15 6 15 17v10c0 8-7 14-15 14S9 39 9 31V21Z");
-    body.setAttribute("fill", "#2DD4FF");
-    const face = document.createElementNS(SVG_NS, "path");
-    face.setAttribute("d", "M14 20c0-7 4-11 10-11s10 4 10 11v6c0 6-4 10-10 10s-10-4-10-10v-6Z");
-    face.setAttribute("fill", "#071D40");
-    const eyes = document.createElementNS(SVG_NS, "path");
-    eyes.setAttribute("d", "M17 21a3 3 0 1 0 6 0 3 3 0 0 0-6 0Zm8 0a3 3 0 1 0 6 0 3 3 0 0 0-6 0ZM20 29q4 4 8 0");
-    eyes.setAttribute("fill", "none");
-    eyes.setAttribute("stroke", "#FFC22E");
-    eyes.setAttribute("stroke-width", "2");
-    eyes.setAttribute("stroke-linecap", "round");
-    svg.append(body, face, eyes);
-    return svg;
+    const image = document.createElement("img");
+    image.className = className;
+    image.src = "/voice-mascot-32.png";
+    image.alt = "";
+    image.setAttribute("aria-hidden", "true");
+    return image;
   }
 
   function lineIcon(pathData, className = "nav-line-icon") {

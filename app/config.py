@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     whisper_model: str = "tiny"
     whisper_compute_type: str = "int8"
     whisper_device: str = "cpu"
+    whisper_cpu_threads: int = 1
+    whisper_num_workers: int = 1
     # Parallel STT workers (CPU default 1). VOICE_MAX_CONCURRENCY is a legacy alias.
     voice_max_parallel: int = Field(1, ge=1)
     voice_max_concurrency: int = Field(1, ge=1)
@@ -38,7 +40,7 @@ class Settings(BaseSettings):
     voice_queue_max: int = Field(16, ge=0)
     # Notify when waiting count after admission is >= this (waiting only).
     voice_queue_notify_at: int = Field(2, ge=1)
-    voice_max_seconds: float = 30
+    voice_max_seconds: float = 10
     voice_max_bytes: int = 5_242_880
     tts_cache_size: int = 128
     # Retained for older .env files; admission uses voice_queue_max instead.
@@ -48,7 +50,7 @@ class Settings(BaseSettings):
     voice_speak_rate: int = 20
     voice_tts_timeout: float = 4.0
     voice_audio_ttl: float = 300.0
-    voice_vad_silence_ms: int = 800
+    voice_vad_silence_ms: int = 700
     voice_idle_prompt_seconds: int = 20
 
     @model_validator(mode="after")

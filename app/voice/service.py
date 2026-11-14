@@ -8,18 +8,20 @@ import time
 from collections import defaultdict, deque
 from typing import Awaitable, Callable
 
+from app.config import settings
 from app.services.chat_service import run_parent_turn
+from app.voice.constants import COULD_NOT_HEAR
 from app.voice.speech_text import clean_for_speech
-from app.voice.stt import SttEngine, Transcript
+from app.voice.stt import SpeechToText, Transcript
 from app.voice.storage import AudioStore
 from app.voice.transcription_queue import (
     TranscriptionQueue,
     TranscriptionQueueClosed,
     TranscriptionQueueFull,
 )
-from app.voice.tts import TtsEngine
+from app.voice.tts import TextToSpeech
 
-logger = logging.getLogger(__name__)
+operations_logger = logging.getLogger("uvicorn.error")
 
 QueueNotifier = Callable[[str, str], Awaitable[None]]
 
@@ -51,8 +53,8 @@ class SlidingRateLimiter:
 class VoiceService:
     def __init__(
         self,
-        stt: SttEngine,
-        tts: TtsEngine,
+        stt: SpeechToText,
+        tts: TextToSpeech,
         audio_store: AudioStore,
         *,
         max_parallel: int | None = None,
@@ -65,6 +67,7 @@ class VoiceService:
         speak_rate: int = 20,
         max_seconds: float = 30.0,
         queue_notifier: QueueNotifier | None = None,
+        tts_timeout: float | None = None,
     ):
         self.stt = stt
         self.tts = tts
@@ -80,19 +83,30 @@ class VoiceService:
         self.speak_rate = speak_rate
         self.max_seconds = max_seconds
         self._queue_notifier = queue_notifier
+        self.tts_timeout = (
+            settings.voice_tts_timeout if tts_timeout is None else tts_timeout
+        )
         self._queue = TranscriptionQueue(
             max_parallel=self.max_parallel,
             queue_max=self.queue_max,
             notify_at=self.queue_notify_at,
         )
+        # Browser text turns skip STT; keep a small concurrency gate for agent work.
+        self._slots = asyncio.Semaphore(self.max_parallel)
         self._rates = SlidingRateLimiter()
 
     def check_rate(self, action: str, guardian_id: str) -> None:
         limit = self.guardian_rate if action == "chat" else self.speak_rate
-        if not self._rates.allow(action, guardian_id, limit) or not self._rates.allow(
-            "global", "__global__", self.global_rate
-        ):
-            raise VoiceError(429, "Voice request rate limit exceeded")
+        if not self._rates.allow(action, guardian_id, limit):
+            operations_logger.warning(
+                "voice_rejected reason=guardian_rate action=%s guardian_id=%s",
+                action,
+                guardian_id,
+            )
+            raise VoiceError(429, "Too many voice requests. Please wait up to one minute.")
+        if not self._rates.allow("global", "__global__", self.global_rate):
+            operations_logger.warning("voice_rejected reason=global_rate action=%s", action)
+            raise VoiceError(429, "The voice service request limit was reached. Please wait one minute.")
 
     async def chat(
         self,
@@ -107,6 +121,7 @@ class VoiceService:
         upload_ms: int = 0,
         decode_ms: int = 0,
     ) -> dict:
+        del content_type  # callers pass MIME; STT expects WAV bytes after decode
         self.check_rate("chat", guardian["id"])
         fallback_language = _voice_language(language, guardian)
         status_language = fallback_language
@@ -124,10 +139,11 @@ class VoiceService:
         async def transcribe() -> Transcript:
             nonlocal stt_ms
             prompt = _initial_prompt(student)
+            stt_language = _stt_language(language, guardian)
             stt_started = time.perf_counter()
             try:
                 return await asyncio.to_thread(
-                    self.stt.transcribe, audio, content_type, None, prompt
+                    self._transcribe, audio, stt_language, prompt
                 )
             finally:
                 stt_ms = round((time.perf_counter() - stt_started) * 1000)
@@ -143,8 +159,8 @@ class VoiceService:
 
         reply_language = choose_reply_language(transcript)
         if (
-            transcript.duration is not None
-            and transcript.duration > self.max_seconds
+            transcript.duration_seconds is not None
+            and transcript.duration_seconds > self.max_seconds
         ):
             raise VoiceError(413, f"Audio exceeds the {self.max_seconds:g} second limit")
         if _is_unusable_transcript(transcript):
@@ -158,6 +174,7 @@ class VoiceService:
                 decode_ms,
                 admission.wait_ms,
                 stt_ms,
+                queue_notice,
             )
         thread_id = (
             f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
@@ -175,10 +192,7 @@ class VoiceService:
         )
         replied = time.perf_counter()
         spoken_text = clean_for_speech(result["reply"], reply_language)
-        try:
-            speech = await self.tts.synthesize(spoken_text, reply_language)
-        except Exception:
-            speech = b""
+        speech = await self._speak(spoken_text, reply_language)
         finished = time.perf_counter()
         audio_id = (
             self.audio_store.put(audio_owner_key(tenant_id, guardian["id"]), speech)
@@ -199,7 +213,7 @@ class VoiceService:
             "tts": round((finished - replied) * 1000),
         }
         timings_ms["total"] = sum(timings_ms.values())
-        logger.info(
+        operations_logger.info(
             "voice_turn guardian_id=%s session_id=%s language=%s "
             "queue_waiting_at_admit=%s timings_ms=%s",
             guardian["id"],
@@ -226,6 +240,92 @@ class VoiceService:
             "timings_ms": timings_ms,
         }
 
+    async def text_chat(
+        self,
+        *,
+        tenant_id: str,
+        guardian: dict,
+        student: dict,
+        transcript: str,
+        language: str | None,
+        session_id: str | None,
+    ) -> dict:
+        """Run a browser-transcribed voice turn without server STT or TTS."""
+        started = time.perf_counter()
+        try:
+            await asyncio.wait_for(self._slots.acquire(), timeout=self.queue_timeout)
+        except TimeoutError:
+            operations_logger.warning(
+                "voice_rejected reason=queue_busy guardian_id=%s timeout_seconds=%.2f",
+                guardian["id"],
+                self.queue_timeout,
+            )
+            raise VoiceError(
+                429, "Voice service is processing another request. Please try again."
+            ) from None
+        queued = time.perf_counter()
+        try:
+            self.check_rate("chat", guardian["id"])
+            reply_language = choose_reply_language(
+                Transcript(
+                    text=transcript,
+                    language=language,
+                    duration_seconds=None,
+                )
+            )
+            thread_id = (
+                f"{guardian['id']}:{session_id}" if session_id else guardian["id"]
+            )
+            result = await asyncio.to_thread(
+                run_parent_turn,
+                tenant_id,
+                guardian,
+                student,
+                transcript,
+                "voice",
+                thread_id,
+                reply_language,
+            )
+            finished = time.perf_counter()
+            router_ms = int(result.get("router_ms") or 0)
+            agent_ms = int(
+                result.get("agent_llm_ms")
+                or max(0, round((finished - queued) * 1000) - router_ms)
+            )
+            timings_ms = {
+                "upload": 0,
+                "decode": 0,
+                "queue": round((queued - started) * 1000),
+                "stt": 0,
+                "router": router_ms,
+                "agent_llm": agent_ms,
+                "tts": 0,
+            }
+            timings_ms["total"] = sum(timings_ms.values())
+            operations_logger.info(
+                "voice_text_turn guardian_id=%s session_id=%s language=%s timings_ms=%s",
+                guardian["id"],
+                session_id or "default",
+                reply_language,
+                timings_ms,
+            )
+            return {
+                **result,
+                "language": reply_language,
+                "transcript": transcript,
+                "audio_id": None,
+                "timings": {
+                    "queue": timings_ms["queue"],
+                    "stt": 0,
+                    "llm": timings_ms["router"] + timings_ms["agent_llm"],
+                    "tts": 0,
+                    "total": timings_ms["total"],
+                },
+                "timings_ms": timings_ms,
+            }
+        finally:
+            self._slots.release()
+
     async def _friendly_retry(
         self,
         transcript: Transcript,
@@ -237,13 +337,11 @@ class VoiceService:
         decode_ms: int,
         wait_ms: int,
         stt_ms: int,
+        queue_notice: str | None = None,
     ) -> dict:
         reply = _RETRY_REPLIES.get(language, _RETRY_REPLIES["en"])
         tts_started = time.perf_counter()
-        try:
-            speech = await self.tts.synthesize(reply, language)
-        except Exception:
-            speech = b""
+        speech = await self._speak(reply, language)
         finished = time.perf_counter()
         timings_ms = {
             "upload": upload_ms,
@@ -270,6 +368,7 @@ class VoiceService:
                 else None
             ),
             "tts_degraded": not bool(speech),
+            "queue_notice": queue_notice,
             "timings": {
                 "queue": timings_ms["queue"],
                 "stt": timings_ms["stt"],
@@ -286,11 +385,40 @@ class VoiceService:
         if not cleaned:
             raise VoiceError(422, "Text has no speakable content")
         try:
-            return await self.tts.synthesize(cleaned, language)
+            speech = await self._speak(cleaned, language, degrade=False)
         except ValueError as exc:
             raise VoiceError(422, str(exc)) from None
         except Exception:
             raise VoiceError(503, "Text-to-speech is temporarily unavailable") from None
+        if not speech:
+            raise VoiceError(503, "Text-to-speech is temporarily unavailable")
+        return speech
+
+    def _transcribe(
+        self, audio: bytes, language: str | None, initial_prompt: str | None
+    ) -> Transcript:
+        # WhisperSTT accepts initial_prompt; plain Protocol fakes may ignore it.
+        try:
+            return self.stt.transcribe(  # type: ignore[call-arg]
+                audio, language, initial_prompt=initial_prompt
+            )
+        except TypeError:
+            return self.stt.transcribe(audio, language)
+
+    async def _speak(
+        self, text: str, language: str, *, degrade: bool = True
+    ) -> bytes:
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self.tts.speak, text, language),
+                timeout=self.tts_timeout,
+            )
+        except ValueError:
+            raise
+        except Exception:
+            if degrade:
+                return b""
+            raise
 
     def close(self) -> None:
         close = getattr(self.tts, "close", None)
@@ -307,11 +435,7 @@ class VoiceService:
             loop.create_task(self._queue.close())
 
 
-_RETRY_REPLIES = {
-    "en": "I could not hear a clear question. Please try again.",
-    "hi": "मुझे सवाल साफ़ सुनाई नहीं दिया। कृपया फिर से बोलें।",
-    "te": "నాకు ప్రశ్న స్పష్టంగా వినిపించలేదు. దయచేసి మళ్లీ చెప్పండి.",
-}
+_RETRY_REPLIES = COULD_NOT_HEAR
 
 _QUEUE_STATUS = {
     "en": "Got your message — I'm processing it now.",
@@ -344,10 +468,18 @@ def _initial_prompt(student: dict) -> str:
 
 
 def _voice_language(override: str | None, guardian: dict) -> str:
+    if override in {"en", "hi"}:
+        return override
+    preferred = guardian.get("preferred_language")
+    return preferred if preferred in {"en", "hi"} else "en"
+
+
+def _stt_language(override: str | None, guardian: dict) -> str | None:
+    """Pass a language to Whisper when known so it skips detection."""
     if override in {"en", "hi", "te"}:
         return override
     preferred = guardian.get("preferred_language")
-    return preferred if preferred in {"en", "hi", "te"} else "en"
+    return preferred if preferred in {"en", "hi", "te"} else None
 
 
 def choose_reply_language(transcript: Transcript) -> str:
