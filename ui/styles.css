@@ -4456,7 +4456,7 @@ tbody tr:hover { background: rgba(45, 212, 255, 0.07); }
   .chat-intro { padding: 15px 16px; }
 }
 
-/* Next UI — Shizuka voice assistant */
+/* Next UI — Dora voice assistant */
 .voice-mode-page {
   width: min(100%, 50rem);
   padding: 18px 14px calc(112px + env(safe-area-inset-bottom));
